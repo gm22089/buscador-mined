@@ -1,0 +1,756 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscador Maestro de Centros Escolares — MINED</title>
+<style>
+  :root{
+    --azul-inst: #14375E;
+    --azul-inst-dark: #0C2740;
+    --oro: #B8892B;
+    --oro-suave: #F4E9D2;
+    --fondo: #F5F4F0;
+    --panel: #FFFFFF;
+    --linea: #E2DFD6;
+    --texto: #23282D;
+    --texto-suave: #63625C;
+    --verde: #1E7145;
+    --rojo: #A3331E;
+  }
+ 
+  *{ box-sizing: border-box; }
+ 
+  body{
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+    margin: 0;
+    padding: 0 0 60px 0;
+  }
+ 
+  header.top{
+    background: linear-gradient(135deg, var(--azul-inst) 0%, var(--azul-inst-dark) 100%);
+    color: #fff;
+    padding: 28px 24px 34px;
+    border-bottom: 4px solid var(--oro);
+  }
+ 
+  header.top .marca{
+    max-width: 1040px;
+    margin: 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+ 
+  header.top .marca .eyebrow{
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--oro-suave);
+    font-weight: 600;
+  }
+ 
+  header.top h1{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 26px;
+    margin: 4px 0 0 0;
+    font-weight: 700;
+    max-width: 1040px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+ 
+  header.top p.sub{
+    max-width: 1040px;
+    margin: 6px auto 0;
+    color: #C9D6E3;
+    font-size: 13.5px;
+  }
+ 
+  main{
+    max-width: 1040px;
+    margin: -20px auto 0;
+    padding: 0 24px;
+  }
+ 
+  .buscador{
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(12,39,64,0.14);
+    padding: 18px;
+    display: flex;
+    gap: 10px;
+    position: relative;
+  }
+
+  .campo-busqueda{
+    position: relative;
+    flex-grow: 1;
+  }
+ 
+  .buscador input{
+    width: 100%;
+    padding: 13px 14px;
+    font-size: 14px;
+    border: 1px solid #C7C4B8;
+    border-radius: 6px;
+    color: var(--texto);
+    background: #FBFAF7;
+  }
+  .buscador input:focus{
+    outline: none;
+    border-color: var(--azul-inst);
+    box-shadow: 0 0 0 3px rgba(20,55,94,0.12);
+  }
+
+  .sugerencias{
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--panel);
+    border: 1px solid var(--linea);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(12,39,64,0.18);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 20;
+  }
+  .sugerencias.show{ display: block; }
+
+  .sugerencia-item{
+    padding: 10px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--linea);
+    line-height: 1.35;
+  }
+  .sugerencia-item:last-child{ border-bottom: none; }
+  .sugerencia-item:hover, .sugerencia-item.activa{
+    background: var(--oro-suave);
+  }
+  .sugerencia-item .cod{
+    font-weight: 700;
+    color: var(--azul-inst);
+    margin-right: 4px;
+  }
+  .sugerencia-item .resto{
+    color: var(--texto-suave);
+  }
+  .sugerencias .sug-info{
+    padding: 8px 14px;
+    font-size: 11.5px;
+    color: var(--texto-suave);
+    font-style: italic;
+    border-bottom: 1px solid var(--linea);
+  }
+ 
+  .btn-buscar{
+    padding: 13px 22px;
+    font-size: 14px;
+    cursor: pointer;
+    background: var(--azul-inst);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: background 0.15s ease;
+  }
+  .btn-buscar:hover{ background: var(--azul-inst-dark); }
+  .btn-buscar:disabled{ background: #B7B5AC; cursor: not-allowed; }
+ 
+  #estadoDiccionario {
+    max-width: 1040px;
+    margin: 10px auto 0;
+    font-size: 12.5px;
+    color: var(--texto-suave);
+    font-weight: 600;
+  }
+  .estado-ok { color: var(--verde); }
+
+  #estadoText{
+    max-width: 1040px;
+    margin: 14px auto 0;
+    font-size: 13.5px;
+    color: var(--texto-suave);
+  }
+  #estadoText.error{ color: var(--rojo); font-weight: 600; }
+ 
+  .dashboard{
+    display: none;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+ 
+  .panel{
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: 0 1.6px 3.6px rgba(0,0,0,0.09), 0 0.3px 0.9px rgba(0,0,0,0.08);
+    padding: 22px;
+  }
+ 
+  .panel h2{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 17px;
+    margin: 0 0 4px 0;
+    color: var(--azul-inst);
+  }
+ 
+  .panel .desc{
+    font-size: 12.5px;
+    color: var(--texto-suave);
+    margin: 0 0 14px 0;
+  }
+ 
+  .fila-dato{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--linea);
+  }
+  .fila-dato:last-child{ border-bottom: none; }
+ 
+  .texto-dato{ font-size: 13.5px; flex-grow: 1; }
+  .texto-dato strong{
+    display: block;
+    color: var(--texto-suave);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+  }
+  .texto-dato span.valor{
+    color: var(--texto);
+    word-break: break-word;
+  }
+  .texto-dato span.valor.no-disp{
+    color: #A3A099;
+    font-style: italic;
+  }
+ 
+  .acciones-btn{ display: flex; gap: 6px; flex-shrink: 0; }
+ 
+  .btn-copiar, .btn-link{
+    border: 1px solid #C7C4B8;
+    padding: 6px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11.5px;
+    white-space: nowrap;
+    font-family: inherit;
+    text-decoration: none;
+  }
+  .btn-copiar{ background: #FAF9F6; color: var(--texto); }
+  .btn-copiar:hover{ background: var(--linea); }
+  .btn-link{ background: var(--oro-suave); color: #7A5A18; border-color: #DFC98A; font-weight: 600; }
+  .btn-link:hover{ background: #EEDDAE; }
+ 
+  .btn-super-fetch{
+    background: var(--verde);
+    color: #fff;
+    border: none;
+    padding: 14px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .btn-super-fetch:hover{ background: #17532F; }
+ 
+  .preview-box{
+    background: #FBFAF7;
+    padding: 12px;
+    border: 1px dashed #C7C4B8;
+    border-radius: 6px;
+    font-size: 11.5px;
+    color: var(--texto-suave);
+    white-space: pre-wrap;
+    max-height: 260px;
+    overflow-y: auto;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  }
+ 
+  .skeleton{
+    height: 42px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #EDEBE4 25%, #F5F4F0 37%, #EDEBE4 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  @keyframes shimmer{
+    0%{ background-position: 100% 50%; }
+    100%{ background-position: 0 50%; }
+  }
+ 
+  #toast{
+    visibility: hidden;
+    min-width: 260px;
+    background: var(--azul-inst-dark);
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 13px 16px;
+    position: fixed;
+    z-index: 10;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 13.5px;
+  }
+  #toast.show{ visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.7s; }
+  @keyframes fadein{ from{bottom:0; opacity:0;} to{bottom:30px; opacity:1;} }
+  @keyframes fadeout{ from{bottom:30px; opacity:1;} to{bottom:0; opacity:0;} }
+ 
+  @media (max-width: 760px){
+    .dashboard{ grid-template-columns: 1fr; }
+    .buscador{ flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+ 
+<header class="top">
+  <div class="marca">
+    <span class="eyebrow">Consulta de datos oficiales</span>
+  </div>
+  <h1>Buscador Maestro de Centros Escolares</h1>
+  <p class="sub">Extrae en un clic la ficha completa de un Centro Educativo desde el panel público de Power BI.</p>
+</header>
+ 
+<main>
+  <div class="buscador">
+    <div class="campo-busqueda">
+      <input type="text" id="ceInput" placeholder="Ejemplo: 10007" disabled autocomplete="off">
+      <div id="sugerencias" class="sugerencias"></div>
+    </div>
+    <button id="btnBuscar" class="btn-buscar" onclick="ejecutarBusquedaMaestra()" disabled>Extraer datos</button>
+  </div>
+ 
+  <div id="estadoDiccionario">⏳ Descargando diccionario de códigos desde el MINED...</div>
+  <p id="estadoText"></p>
+ 
+  <div id="dashboardCE" class="dashboard">
+ 
+    <div class="panel">
+      <h2>Datos detallados</h2>
+      <p class="desc">Cada dato se consulta por separado directamente desde el dataset público.</p>
+      <div id="listaDetalles"></div>
+    </div>
+ 
+    <div class="panel" style="display:flex; flex-direction:column;">
+      <h2>Ficha resumen</h2>
+      <p class="desc">Bloque consolidado listo para copiar y pegar.</p>
+ 
+      <button class="btn-super-fetch" onclick="copiarSuperFetch()">Copiar Ficha Completa</button>
+ 
+      <span style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--texto-suave); margin-bottom:6px;">Vista previa</span>
+      <div id="previewSuperText" class="preview-box">Cargando bloque…</div>
+    </div>
+ 
+  </div>
+</main>
+ 
+<div id="toast"></div>
+ 
+<script>
+  let diccionarioNombres = [];
+  let textoSuperFetchGuardado = "";
+
+  const HEADERS_API = {
+    "Accept": "application/json, text/plain, */*",
+    "X-PowerBI-ResourceKey": "d959e760-42b8-4e9a-8a41-de0d6ca8f8ce",
+    "Content-Type": "application/json;charset=UTF-8"
+  };
+  const URL_API = "https://wabi-paas-1-scus-api.analysis.windows.net/public/reports/querydata?synchronous=true";
+  const DATASET_ID = "1286915e-8f7f-487f-bae3-73a9e488c456";
+  const REPORT_ID = "243201a2-4a9e-4f70-9997-ed23d079ba3f";
+  const MODEL_ID = 3759890;
+ 
+  const CAMPOS = [
+    { titulo: "Código de infraestructura", tipo: "estandar", entidad: "CE_2024", propiedad: "Código", nombre: "Sum(CE_2024.Código)", visualId: "856bb84f10fd156985da" },
+    { titulo: "Nombre del centro educativo", tipo: "estandar", entidad: "CE_2024", propiedad: "Nombre del Centro Educativo", nombre: "CE_2024.Nombre del Centro Educativo", visualId: "b93ea371a1f3bb83f326" },
+    { titulo: "Turno", tipo: "medida", entidad: "Turnos", propiedad: "Turno Unificado", nombre: "Turnos.Turno Unificado", visualId: "7e327bf503501c9516eb" },
+    { titulo: "Departamento", tipo: "estandar", entidad: "CE_2024", propiedad: "Departamento", nombre: "CE_2024.Departamento", visualId: "6cdf5b34f04fd237b4dc" },
+    { titulo: "Distrito", tipo: "estandar", entidad: "CE_2024", propiedad: "Distrito", nombre: "CE_2024.Distrito", visualId: "b917b9f95449267164bb" },
+    { titulo: "Municipio", tipo: "estandar", entidad: "CE_2024", propiedad: "Municipio", nombre: "CE_2024.Municipio", visualId: "17095abaaae058a6f737" },
+    { titulo: "Dirección", tipo: "estandar", entidad: "CE_2024", propiedad: "Dirección", nombre: "CE_2024.Dirección", visualId: "0118ca5223a73939f738" },
+    { titulo: "Director/a o encargado/a", tipo: "estandar", entidad: "CE_2024", propiedad: "Director", nombre: "CE_2024.Director", visualId: "75502b5490740a180fe1" },
+    { titulo: "Teléfono", tipo: "medida", entidad: "CE_2024", propiedad: "Telefono Concatenado", nombre: "CE_2024.Telefono Concatenado", visualId: "e816dcdbab7208ab4e3d", insertarMatriculaDespues: true },
+    { titulo: "Distancia", tipo: "estandar", entidad: "CE_2024", propiedad: "Distancia", nombre: "CE_2024.Distancia", visualId: "0b1fa04b30a5055ab20a" },
+    { titulo: "En rango", tipo: "estandar", entidad: "CE_2024", propiedad: "EnRango", nombre: "CE_2024.EnRango", visualId: "1600f9a53b0180267b01" },
+    { titulo: "Google Maps", tipo: "estandar", entidad: "CE_2024", propiedad: "GoogleMapsLink", nombre: "Min(CE_2024.GoogleMapsLink)", visualId: "b28aa4dcfa84d1cc5a9d", esEnlace: true },
+    { titulo: "Waze", tipo: "estandar", entidad: "CE_2024", propiedad: "WazeLink", nombre: "Min(CE_2024.WazeLink)", visualId: "fb37bcfcc6e9b1c54a31", esEnlace: true }
+  ];
+ 
+  const CAMPO_MATRICULA = { titulo: "Matrícula (Niñas / Niños / Total)", visualId: "a02129f7adc9b41376c6" };
+  const CAMPO_SUPER_FETCH = { visualId: "d05d6442e975bcb494d7" };
+ 
+  // ==========================================
+  // PASO 0: DESCARGAR DICCIONARIO AL INICIAR
+  // ==========================================
+  window.onload = async function() {
+      const bodyDiccionario = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"},"Name":"CE_2024.Infra_y_Nombre_CE"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"}}}]},\"Binding\":{\"Primary\":{\"Groupings\":[{\"Projections\":[0]}]},\"DataReduction\":{\"DataVolume\":3,\"Primary\":{\"Top\":{\"Count\":30000}}},\"Version\":1},\"ExecutionMetricsKind\":1}}]},\"ApplicationContext\":{\"DatasetId\":\"1286915e-8f7f-487f-bae3-73a9e488c456\",\"Sources\":[{\"ReportId\":\"243201a2-4a9e-4f70-9997-ed23d079ba3f\",\"VisualId\":\"9e229e8ff2abde49259a\"}]}}],\"cancelQueries\":[],\"modelId\":3759890}`;
+      
+      try {
+          const response = await fetch(URL_API, { headers: HEADERS_API, body: bodyDiccionario, method: "POST", mode: "cors" });
+          const textoCrudo = await response.text(); 
+          
+          const regexColegios = /"\d{4,5}\s+[^"]+"/g;
+          const coincidencias = textoCrudo.match(regexColegios);
+          
+          if (coincidencias && coincidencias.length > 0) {
+              diccionarioNombres = coincidencias.map(texto => texto.replace(/"/g, ''));
+              diccionarioNombres = [...new Set(diccionarioNombres)];
+              
+              document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ Diccionario cargado con ${diccionarioNombres.length} Centros Escolares. Listo para buscar.</span>`;
+              document.getElementById("ceInput").disabled = false;
+              document.getElementById("btnBuscar").disabled = false;
+              document.getElementById("ceInput").focus();
+          } else {
+              document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ El servidor no devolvió la lista. Puede que la sesión haya caducado.</span>`;
+          }
+      } catch (error) {
+          document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar el diccionario.</span>`;
+      }
+  };
+
+  async function ejecutarBusquedaMaestra() {
+    const codigoCorto = document.getElementById("ceInput").value.trim();
+    const estadoText = document.getElementById("estadoText");
+    const dashboardCE = document.getElementById("dashboardCE");
+    const listaDetalles = document.getElementById("listaDetalles");
+    const btnBuscar = document.getElementById("btnBuscar");
+    const previewBox = document.getElementById("previewSuperText");
+ 
+    if (!codigoCorto) {
+      estadoText.innerText = "Escribe el código del Centro Educativo antes de buscar.";
+      estadoText.className = "error";
+      return;
+    }
+
+    // Traducir el código corto al nombre oficial largo
+    const nombreCE = diccionarioNombres.find(nombre => nombre.startsWith(codigoCorto));
+    
+    if (!nombreCE) {
+        estadoText.innerText = `❌ No se encontró ningún Centro Escolar que inicie con el código "${codigoCorto}".`;
+        estadoText.className = "error";
+        dashboardCE.style.display = "none";
+        return;
+    }
+ 
+    estadoText.innerHTML = `Detectado: <strong>${nombreCE}</strong><br>Consultando el dataset en paralelo…`;
+    estadoText.className = "";
+    dashboardCE.style.display = "none";
+    listaDetalles.innerHTML = "";
+    previewBox.innerText = "Cargando bloque…";
+    btnBuscar.disabled = true;
+ 
+    // Skeletons mientras carga
+    for (let i = 0; i < CAMPOS.length + 1; i++) {
+      listaDetalles.innerHTML += `<div class="skeleton"></div>`;
+    }
+ 
+    try {
+      const peticionesCampos = CAMPOS.map(campo => hacerPeticion(generarBodyCampo(campo, nombreCE)));
+      const peticionMatricula = hacerPeticion(generarBodyMatricula(nombreCE));
+      const peticionSuperFetch = hacerPeticion(generarBodySuperFetch(nombreCE));
+ 
+      const [resultadosCampos, respMatricula, respSuperFetch] = await Promise.all([
+        Promise.all(peticionesCampos),
+        peticionMatricula,
+        peticionSuperFetch
+      ]);
+ 
+      listaDetalles.innerHTML = "";
+ 
+      const textoMatricula = extraerValorMatricula(respMatricula);
+ 
+      resultadosCampos.forEach((resp, i) => {
+        const campo = CAMPOS[i];
+        const valor = extraerValorEstandar(resp);
+        agregarFilaUI(campo.titulo, valor, listaDetalles, !!campo.esEnlace);
+        if (campo.insertarMatriculaDespues) {
+          agregarFilaUI(CAMPO_MATRICULA.titulo, textoMatricula, listaDetalles);
+        }
+      });
+ 
+      textoSuperFetchGuardado = extraerValorEstandar(respSuperFetch);
+      previewBox.innerText = textoSuperFetchGuardado;
+ 
+      estadoText.innerText = "";
+      dashboardCE.style.display = "grid";
+ 
+    } catch (error) {
+      console.error(error);
+      estadoText.innerText = "Hubo un error de conexión con Power BI. Intenta de nuevo.";
+      estadoText.className = "error";
+    } finally {
+      btnBuscar.disabled = false;
+    }
+  }
+ 
+  // --- EXTRACCIÓN JSON ---
+  function extraerValorEstandar(data) {
+    try {
+      const m0 = data.results[0].result.data.dsr.DS[0].PH[0].DM0[0].M0;
+      if (m0 === undefined || m0 === null || m0 === "") return "Dato no disponible";
+      return String(m0);
+    } catch (e) { return "Dato no disponible"; }
+  }
+ 
+  function extraerValorMatricula(data) {
+    try {
+      const dm0 = data.results[0].result.data.dsr.DS[0].PH[0].DM0[0];
+      if (dm0.C && dm0.C.length >= 3) return `Niñas: ${dm0.C[0]} | Niños: ${dm0.C[1]} | Total: ${dm0.C[2]}`;
+      if (dm0.M0 !== undefined) return `Niñas: ${dm0.M0} | Niños: ${dm0.M1} | Total: ${dm0.M2}`;
+      return "Matrícula no encontrada";
+    } catch (e) { return "Dato no disponible"; }
+  }
+ 
+  // --- INTERFAZ ---
+  function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
+    const sinDato = (valor === "Dato no disponible" || valor === "Matrícula no encontrada");
+    const valorSeguro = String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    let botonesHTML = `<button class="btn-copiar" onclick="copiarAlPortapapeles('${valorSeguro}')">Copiar</button>`;
+ 
+    if (esEnlace && !sinDato && valor.includes("http")) {
+      const urlSegura = valor.replace(/"/g, "&quot;");
+      botonesHTML = `
+        <a href="${urlSegura}" target="_blank" rel="noopener" class="btn-link">Abrir ruta</a>
+        <button class="btn-copiar" onclick="copiarAlPortapapeles('${valorSeguro}')">Copiar link</button>`;
+    }
+ 
+    const claseValor = sinDato ? "valor no-disp" : "valor";
+ 
+    contenedor.innerHTML += `
+      <div class="fila-dato">
+        <div class="texto-dato"><strong>${titulo}</strong><span class="${claseValor}">${escaparHTML(String(valor))}</span></div>
+        <div class="acciones-btn">${botonesHTML}</div>
+      </div>`;
+  }
+ 
+  function escaparHTML(str) {
+    const div = document.createElement("div");
+    div.innerText = str;
+    return div.innerHTML;
+  }
+ 
+  // --- MOTOR DE PETICIONES ---
+  async function hacerPeticion(bodyString) {
+    const response = await fetch(URL_API, {
+      headers: HEADERS_API,
+      body: bodyString,
+      method: "POST",
+      mode: "cors",
+      credentials: "omit"
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  }
+ 
+  // --- GENERADORES DE CUERPO DE PETICIÓN ---
+  function generarBodyCampo(campo, nombreCE) {
+    const funcion = campo.tipo === "medida" ? null : 3; 
+    const selectBlock = campo.tipo === "medida"
+      ? `{"Measure":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"${campo.propiedad}"},"Name":"${campo.nombre}"}`
+      : `{"Aggregation":{"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"${campo.propiedad}"}},"Function":3},"Name":"${campo.nombre}"}`;
+ 
+    const entidadTurno = campo.entidad === "Turnos"
+      ? `{"Name":"c","Entity":"Turnos","Type":0},{"Name":"c1","Entity":"CE_2024","Type":0}`
+      : `{"Name":"c","Entity":"${campo.entidad}","Type":0}`;
+ 
+    const whereSource = campo.entidad === "Turnos" ? "c1" : "c";
+ 
+    return `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[${entidadTurno}],"Select":[${selectBlock}],"Where":[{"Condition":{"In":{"Expressions":[{"Column":{"Expression":{"SourceRef":{"Source":"${whereSource}"}},"Property":"Infra_y_Nombre_CE"}}],"Values":[[{"Literal":{"Value":"'${nombreCE}'"}}]]}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0],"Subtotal":1}]},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"${campo.visualId}"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+  }
+ 
+  function generarBodyMatricula(nombreCE) {
+    return `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_ESTADÍSTICAS","Type":0},{"Name":"c1","Entity":"CE_2024","Type":0}],"Select":[{"Aggregation":{"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"MATRICULA_NIÑAS"}},"Function":0},"Name":"Sum(CE_ESTADÍSTICAS.MATRICULA_NIÑAS)"},{"Aggregation":{"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"MATRICULA_NIÑOS"}},"Function":0},"Name":"Sum(CE_ESTADÍSTICAS.MATRICULA_NIÑOS)"},{"Aggregation":{"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"TOTAL_MATRICULA"}},"Function":0},"Name":"Sum(CE_ESTADÍSTICAS.TOTAL_MATRICULA)"}],"Where":[{"Condition":{"In":{"Expressions":[{"Column":{"Expression":{"SourceRef":{"Source":"c1"}},"Property":"Infra_y_Nombre_CE"}}],"Values":[[{"Literal":{"Value":"'${nombreCE}'"}}]]}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0,1,2]}]},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"${CAMPO_MATRICULA.visualId}"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+  }
+ 
+  function generarBodySuperFetch(nombreCE) {
+    return `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Aggregation":{"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"COPIAR_DATOS"}},"Function":3},"Name":"Min(CE_2024.COPIAR_DATOS)"}],"Where":[{"Condition":{"In":{"Expressions":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"}}],"Values":[[{"Literal":{"Value":"'${nombreCE}'"}}]]}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"${CAMPO_SUPER_FETCH.visualId}"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+  }
+ 
+  // --- ACCIONES DE USUARIO ---
+  
+  // Método robusto que funciona tanto en PC como en celulares
+  function copiarAlPortapapeles(texto) {
+    if (navigator.clipboard && window.isSecureContext) {
+      // Intentar método moderno primero
+      navigator.clipboard.writeText(texto)
+        .then(() => mostrarToast(`Copiado: ${texto}`))
+        .catch(() => fallbackCopiar(texto));
+    } else {
+      // Plan B para celulares o archivos locales (como tu caso)
+      fallbackCopiar(texto);
+    }
+  }
+ 
+  function copiarSuperFetch() {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(textoSuperFetchGuardado)
+        .then(() => mostrarToast("Ficha completa copiada"))
+        .catch(() => fallbackCopiar(textoSuperFetchGuardado, "Ficha completa copiada"));
+    } else {
+      // Plan B para celulares
+      fallbackCopiar(textoSuperFetchGuardado, "Ficha completa copiada");
+    }
+  }
+
+  // Función auxiliar invisible para engañar al navegador del celular
+  function fallbackCopiar(texto, mensajePersonalizado) {
+    const textArea = document.createElement("textarea");
+    textArea.value = texto;
+    
+    // Evitar que la pantalla salte o se mueva en el celular
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      // Comando clásico que sí funciona en archivos locales
+      const exitoso = document.execCommand('copy');
+      if (exitoso) {
+        mostrarToast(mensajePersonalizado ? mensajePersonalizado : `Copiado: ${texto}`);
+      } else {
+        mostrarToast("❌ Error al copiar");
+      }
+    } catch (err) {
+      mostrarToast("❌ El navegador bloqueó la copia");
+    }
+    
+    document.body.removeChild(textArea);
+  }
+ 
+  function mostrarToast(mensaje) {
+    const toast = document.getElementById("toast");
+    toast.innerText = mensaje;
+    toast.className = "show";
+    setTimeout(function () { toast.className = toast.className.replace("show", ""); }, 2500);
+  }
+ 
+  // ==========================================
+  // AUTOCOMPLETADO PROGRESIVO (estilo PowerBI)
+  // ==========================================
+  const MAX_SUGERENCIAS = 40;
+  let sugerenciasActuales = [];
+  let indiceActivo = -1;
+
+  const inputCE = document.getElementById("ceInput");
+  const cajaSugerencias = document.getElementById("sugerencias");
+
+  function formatearSugerencia(nombre) {
+    const espacio = nombre.indexOf(" ");
+    if (espacio === -1) return `<span class="cod">${nombre}</span>`;
+    const codigo = nombre.slice(0, espacio);
+    const resto = nombre.slice(espacio + 1);
+    return `<span class="cod">${codigo}</span><span class="resto">${resto}</span>`;
+  }
+
+  function actualizarSugerencias() {
+    const texto = inputCE.value.trim();
+    indiceActivo = -1;
+
+    if (!texto || !diccionarioNombres.length) {
+      cajaSugerencias.classList.remove("show");
+      cajaSugerencias.innerHTML = "";
+      sugerenciasActuales = [];
+      return;
+    }
+
+    const coincidencias = diccionarioNombres.filter(nombre => nombre.startsWith(texto));
+    sugerenciasActuales = coincidencias.slice(0, MAX_SUGERENCIAS);
+
+    if (sugerenciasActuales.length === 0) {
+      cajaSugerencias.innerHTML = `<div class="sug-info">Sin coincidencias para "${texto}"</div>`;
+      cajaSugerencias.classList.add("show");
+      return;
+    }
+
+    let html = "";
+    if (coincidencias.length > MAX_SUGERENCIAS) {
+      html += `<div class="sug-info">Mostrando ${MAX_SUGERENCIAS} de ${coincidencias.length} — sigue escribiendo para acotar</div>`;
+    }
+    sugerenciasActuales.forEach((nombre, i) => {
+      html += `<div class="sugerencia-item" data-index="${i}" onclick="seleccionarSugerencia(${i})">${formatearSugerencia(nombre)}</div>`;
+    });
+    cajaSugerencias.innerHTML = html;
+    cajaSugerencias.classList.add("show");
+  }
+
+  function seleccionarSugerencia(i) {
+    const nombre = sugerenciasActuales[i];
+    if (!nombre) return;
+    const espacio = nombre.indexOf(" ");
+    const codigo = espacio === -1 ? nombre : nombre.slice(0, espacio);
+    inputCE.value = codigo;
+    cajaSugerencias.classList.remove("show");
+    cajaSugerencias.innerHTML = "";
+    sugerenciasActuales = [];
+    ejecutarBusquedaMaestra();
+  }
+
+  function resaltarActiva() {
+    const items = cajaSugerencias.querySelectorAll(".sugerencia-item");
+    items.forEach((el, i) => el.classList.toggle("activa", i === indiceActivo));
+    if (indiceActivo >= 0 && items[indiceActivo]) {
+      items[indiceActivo].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  inputCE.addEventListener("input", actualizarSugerencias);
+
+  inputCE.addEventListener("keydown", function (e) {
+    const listaVisible = cajaSugerencias.classList.contains("show") && sugerenciasActuales.length > 0;
+
+    if (listaVisible && e.key === "ArrowDown") {
+      e.preventDefault();
+      indiceActivo = Math.min(indiceActivo + 1, sugerenciasActuales.length - 1);
+      resaltarActiva();
+      return;
+    }
+    if (listaVisible && e.key === "ArrowUp") {
+      e.preventDefault();
+      indiceActivo = Math.max(indiceActivo - 1, 0);
+      resaltarActiva();
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (listaVisible && indiceActivo >= 0) {
+        seleccionarSugerencia(indiceActivo);
+      } else {
+        cajaSugerencias.classList.remove("show");
+        ejecutarBusquedaMaestra();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      cajaSugerencias.classList.remove("show");
+    }
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!cajaSugerencias.contains(e.target) && e.target !== inputCE) {
+      cajaSugerencias.classList.remove("show");
+    }
+  });
+</script>
+</body>
+</html>
