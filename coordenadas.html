@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coordenadas por Municipio — MINED</title>
+<style>
+  :root{
+    --azul-inst: #14375E;
+    --azul-inst-dark: #0C2740;
+    --oro: #B8892B;
+    --oro-suave: #F4E9D2;
+    --fondo: #F5F4F0;
+    --panel: #FFFFFF;
+    --linea: #E2DFD6;
+    --texto: #23282D;
+    --texto-suave: #63625C;
+    --verde: #1E7145;
+    --rojo: #A3331E;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+    margin: 0;
+    padding: 0 0 60px 0;
+  }
+
+  header.top{
+    background: linear-gradient(135deg, var(--azul-inst) 0%, var(--azul-inst-dark) 100%);
+    color: #fff;
+    padding: 28px 24px 20px;
+    border-bottom: 4px solid var(--oro);
+  }
+
+  header.top .marca{
+    max-width: 1040px;
+    margin: 0 auto;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  header.top .marca .eyebrow{
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--oro-suave);
+    font-weight: 600;
+  }
+
+  header.top h1{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 26px;
+    margin: 4px 0 0 0;
+    font-weight: 700;
+    max-width: 1040px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  header.top p.sub{
+    max-width: 1040px;
+    margin: 6px auto 0;
+    color: #C9D6E3;
+    font-size: 13.5px;
+  }
+
+  .subnav{
+    max-width: 1040px;
+    margin: 18px auto 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .subnav a{
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 999px;
+    color: #C9D6E3;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .subnav a:hover{ background: rgba(255,255,255,0.14); color: #fff; }
+  .subnav a.activa{
+    background: var(--oro);
+    color: #2A1E05;
+    border-color: var(--oro);
+  }
+
+  main{
+    max-width: 1040px;
+    margin: -20px auto 0;
+    padding: 0 24px;
+  }
+
+  .buscador{
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(12,39,64,0.14);
+    padding: 18px;
+    display: flex;
+    gap: 10px;
+    position: relative;
+  }
+
+  .campo-busqueda{
+    position: relative;
+    flex-grow: 1;
+  }
+
+  .buscador input{
+    width: 100%;
+    padding: 13px 14px;
+    font-size: 14px;
+    border: 1px solid #C7C4B8;
+    border-radius: 6px;
+    color: var(--texto);
+    background: #FBFAF7;
+  }
+  .buscador input:focus{
+    outline: none;
+    border-color: var(--azul-inst);
+    box-shadow: 0 0 0 3px rgba(20,55,94,0.12);
+  }
+  .buscador input:disabled{ background: #EFEEE9; color: #A3A099; }
+
+  .sugerencias{
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--panel);
+    border: 1px solid var(--linea);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(12,39,64,0.18);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 20;
+  }
+  .sugerencias.show{ display: block; }
+
+  .sugerencia-item{
+    padding: 10px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--linea);
+    line-height: 1.35;
+  }
+  .sugerencia-item:last-child{ border-bottom: none; }
+  .sugerencia-item:hover, .sugerencia-item.activa{
+    background: var(--oro-suave);
+  }
+  .sugerencias .sug-info{
+    padding: 8px 14px;
+    font-size: 11.5px;
+    color: var(--texto-suave);
+    font-style: italic;
+    border-bottom: 1px solid var(--linea);
+  }
+
+  .btn-buscar{
+    padding: 13px 22px;
+    font-size: 14px;
+    cursor: pointer;
+    background: var(--azul-inst);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: background 0.15s ease;
+  }
+  .btn-buscar:hover{ background: var(--azul-inst-dark); }
+  .btn-buscar:disabled{ background: #B7B5AC; cursor: not-allowed; }
+
+  #estadoDiccionario {
+    max-width: 1040px;
+    margin: 10px auto 0;
+    font-size: 12.5px;
+    color: var(--texto-suave);
+    font-weight: 600;
+  }
+  .estado-ok { color: var(--verde); }
+  .error { color: var(--rojo); }
+
+  #estadoText{
+    max-width: 1040px;
+    margin: 14px auto 0;
+    font-size: 13.5px;
+    color: var(--texto-suave);
+  }
+  #estadoText.error{ color: var(--rojo); font-weight: 600; }
+
+  #resumenResultados{
+    max-width: 1040px;
+    margin: 16px auto 0;
+    font-size: 13px;
+    color: var(--texto-suave);
+    font-weight: 600;
+  }
+
+  .resultados-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .tarjeta-ce{
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: 0 1.6px 3.6px rgba(0,0,0,0.09), 0 0.3px 0.9px rgba(0,0,0,0.08);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tarjeta-ce h3{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 15px;
+    margin: 0;
+    color: var(--azul-inst);
+    line-height: 1.35;
+  }
+
+  .tarjeta-ce .meta{
+    font-size: 12px;
+    color: var(--texto-suave);
+  }
+  .tarjeta-ce .meta strong{ color: var(--texto); font-weight: 600; }
+
+  .tarjeta-ce .coords{
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12.5px;
+    background: #FBFAF7;
+    border: 1px dashed #C7C4B8;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--texto);
+  }
+  .tarjeta-ce .coords.no-disp{
+    color: #A3A099;
+    font-style: italic;
+    border-style: solid;
+  }
+
+  .tarjeta-ce .acciones-btn{
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .btn-copiar, .btn-link{
+    border: 1px solid #C7C4B8;
+    padding: 6px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11.5px;
+    white-space: nowrap;
+    font-family: inherit;
+    text-decoration: none;
+  }
+  .btn-copiar{ background: #FAF9F6; color: var(--texto); }
+  .btn-copiar:hover{ background: var(--linea); }
+  .btn-link{ background: var(--oro-suave); color: #7A5A18; border-color: #DFC98A; font-weight: 600; }
+  .btn-link:hover{ background: #EEDDAE; }
+
+  .skeleton{
+    height: 110px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #EDEBE4 25%, #F5F4F0 37%, #EDEBE4 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  @keyframes shimmer{
+    0%{ background-position: 100% 50%; }
+    100%{ background-position: 0 50%; }
+  }
+
+  #toast{
+    visibility: hidden;
+    min-width: 260px;
+    background: var(--azul-inst-dark);
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 13px 16px;
+    position: fixed;
+    z-index: 10;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 13.5px;
+  }
+  #toast.show{ visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.7s; }
+  @keyframes fadein{ from{bottom:0; opacity:0;} to{bottom:30px; opacity:1;} }
+  @keyframes fadeout{ from{bottom:30px; opacity:1;} to{bottom:0; opacity:0;} }
+
+  @media (max-width: 760px){
+    .resultados-grid{ grid-template-columns: 1fr; }
+    .buscador{ flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="marca">
+    <span class="eyebrow">Consulta de datos oficiales</span>
+  </div>
+  <h1>Coordenadas de Centros Escolares por Municipio</h1>
+  <p class="sub">Busca todos los Centros Educativos de un municipio y obtén sus coordenadas listas para abrir en Waze o Google Maps.</p>
+
+  <nav class="subnav">
+    <a href="index.html">🔎 Buscar por código o nombre</a>
+    <a href="coordenadas.html" class="activa">📍 Buscar por municipio</a>
+  </nav>
+</header>
+
+<main>
+  <div class="buscador">
+    <div class="campo-busqueda">
+      <input type="text" id="municipioInput" placeholder="Ejemplo: AHUACHAPAN CENTRO" disabled autocomplete="off">
+      <div id="sugerencias" class="sugerencias"></div>
+    </div>
+    <button id="btnBuscar" class="btn-buscar" onclick="buscarPorMunicipio()" disabled>Buscar coordenadas</button>
+  </div>
+
+  <div id="estadoDiccionario">⏳ Descargando lista de municipios desde el MINED...</div>
+  <p id="estadoText"></p>
+  <p id="resumenResultados"></p>
+
+  <div id="resultadosGrid" class="resultados-grid"></div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  let diccionarioMunicipios = [];
+
+  const HEADERS_API = {
+    "Accept": "application/json, text/plain, */*",
+    "X-PowerBI-ResourceKey": "d959e760-42b8-4e9a-8a41-de0d6ca8f8ce",
+    "Content-Type": "application/json;charset=UTF-8"
+  };
+  const URL_API = "https://wabi-paas-1-scus-api.analysis.windows.net/public/reports/querydata?synchronous=true";
+  const DATASET_ID = "1286915e-8f7f-487f-bae3-73a9e488c456";
+  const REPORT_ID = "243201a2-4a9e-4f70-9997-ed23d079ba3f";
+  const MODEL_ID = 3759890;
+  const MAX_RESULTADOS = 3000;
+
+  // ==========================================
+  // PASO 0: DESCARGAR LISTA DE MUNICIPIOS
+  // ==========================================
+  window.onload = async function () {
+    const bodyMunicipios = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"},"Name":"CE_2024.Municipio"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"17095abaaae058a6f737"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+
+    try {
+      const respuesta = await hacerPeticion(bodyMunicipios);
+
+      // 🔍 DIAGNÓSTICO: deja la respuesta cruda visible en la consola (F12)
+      // para poder ver exactamente qué estructura está devolviendo Power BI.
+      console.log("Respuesta cruda de Power BI (municipios):", respuesta);
+
+      if (respuesta && respuesta.error) {
+        console.error("Power BI rechazó la consulta:", respuesta.error);
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Power BI rechazó la consulta. Revisa la consola (F12) para ver el detalle del error.</span>`;
+        return;
+      }
+
+      let nombres = [];
+
+      // Intento 1: decodificación estructurada (con soporte de diccionario de valores)
+      const filas = decodificarFilas(respuesta, 1);
+      nombres = filas
+        .map(f => (f && f[0] !== undefined && f[0] !== null) ? String(f[0]) : null)
+        .filter(Boolean)
+        .filter(v => !/^\d+$/.test(v)); // descarta si vino un índice numérico sin resolver
+
+      // Intento 2 (respaldo): si el decodificador estructurado no encontró nada,
+      // busca directamente en el texto crudo cualquier bloque de mayúsculas que
+      // luzca como nombre de municipio (mismo truco que ya usa index.html).
+      if (nombres.length === 0) {
+        console.warn("Decodificación estructurada vacía, probando extracción por texto crudo…");
+        const textoCrudo = JSON.stringify(respuesta);
+        const regexMunicipios = /"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .\-]{2,45})"/g;
+        const vistos = new Set();
+        let m;
+        while ((m = regexMunicipios.exec(textoCrudo)) !== null) {
+          vistos.add(m[1].trim());
+        }
+        nombres = [...vistos];
+      }
+
+      diccionarioMunicipios = [...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es'));
+
+      if (diccionarioMunicipios.length > 0) {
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ ${diccionarioMunicipios.length} municipios disponibles. Escribe uno para empezar.</span>`;
+        document.getElementById("municipioInput").disabled = false;
+        document.getElementById("btnBuscar").disabled = false;
+        document.getElementById("municipioInput").focus();
+      } else {
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ No se pudo leer la lista de municipios. Abre la consola (F12 → Console) y copia lo que aparece ahí; también revisa la pestaña Network para ver la respuesta de la petición a "querydata".</span>`;
+      }
+    } catch (error) {
+      console.error("Error al descargar municipios:", error);
+      document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar la lista de municipios. Revisa la consola (F12) para más detalle.</span>`;
+    }
+  };
+
+  // ==========================================
+  // BÚSQUEDA PRINCIPAL
+  // ==========================================
+  async function buscarPorMunicipio() {
+    const textoInput = document.getElementById("municipioInput").value.trim();
+    const estadoText = document.getElementById("estadoText");
+    const resumen = document.getElementById("resumenResultados");
+    const grid = document.getElementById("resultadosGrid");
+    const btnBuscar = document.getElementById("btnBuscar");
+
+    if (!textoInput) {
+      estadoText.innerText = "Escribe el nombre de un municipio antes de buscar.";
+      estadoText.className = "error";
+      return;
+    }
+
+    // Encontrar la coincidencia exacta (o la más cercana) en el diccionario
+    const query = normalizarTexto(textoInput);
+    let municipio = diccionarioMunicipios.find(m => normalizarTexto(m) === query);
+    if (!municipio) {
+      municipio = diccionarioMunicipios.find(m => normalizarTexto(m).includes(query));
+    }
+
+    if (!municipio) {
+      estadoText.innerText = `❌ No se encontró ningún municipio parecido a "${textoInput}".`;
+      estadoText.className = "error";
+      resumen.innerText = "";
+      grid.innerHTML = "";
+      return;
+    }
+
+    estadoText.innerHTML = `Buscando Centros Educativos en <strong>${municipio}</strong>…`;
+    estadoText.className = "";
+    resumen.innerText = "";
+    grid.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
+    btnBuscar.disabled = true;
+
+    try {
+      const body = generarBodyMunicipio(municipio);
+      const respuesta = await hacerPeticion(body);
+      // Columnas: 0 Nombre, 1 Distrito, 2 Dirección, 3 GoogleMapsLink, 4 WazeLink
+      const filas = decodificarFilas(respuesta, 5);
+
+      grid.innerHTML = "";
+
+      if (filas.length === 0) {
+        estadoText.innerText = `No se encontraron Centros Educativos para "${municipio}".`;
+        estadoText.className = "error";
+      } else {
+        estadoText.innerText = "";
+        resumen.innerText = `${filas.length} Centro(s) Educativo(s) encontrados en ${municipio}`;
+        filas.slice(0, MAX_RESULTADOS).forEach(fila => renderTarjeta(fila, grid));
+      }
+    } catch (error) {
+      console.error(error);
+      estadoText.innerText = "Hubo un error de conexión con Power BI. Intenta de nuevo.";
+      estadoText.className = "error";
+      grid.innerHTML = "";
+    } finally {
+      btnBuscar.disabled = false;
+    }
+  }
+
+  function generarBodyMunicipio(municipio) {
+    return `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"},"Name":"CE_2024.Nombre"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"},"Name":"CE_2024.Distrito"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Dirección"},"Name":"CE_2024.Direccion"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"GoogleMapsLink"},"Name":"CE_2024.GMaps"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"WazeLink"},"Name":"CE_2024.Waze"}],"Where":[{"Condition":{"In":{"Expressions":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"}}],"Values":[[{"Literal":{"Value":"'${municipio.replace(/'/g, "''")}'"}}]]}}}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0,1,2,3,4]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":${MAX_RESULTADOS}}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"0118ca5223a73939f738"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+  }
+
+  // ==========================================
+  // DECODIFICACIÓN DE RESPUESTAS DE POWER BI
+  // ==========================================
+  // Power BI comprime filas repetidas: cuando una fila trae el mismo valor
+  // que la anterior en una columna, la omite y usa un bitmask "R" para
+  // indicar cuáles columnas se repiten. Esta función reconstruye cada fila
+  // completa a partir de esas filas comprimidas. Es un decodificador de
+  // mejor esfuerzo: si el formato cambia, deja el campo como null en vez
+  // de fallar toda la búsqueda.
+  function decodificarFilas(data, numCols) {
+    try {
+      const resultData = data.results[0].result.data;
+      const dm0 = resultData.dsr.DS[0].PH[0].DM0;
+      const valueDicts = resultData.dsr.DS[0].ValueDicts || {};
+
+      // Power BI a veces expone, en el descriptor de la consulta, qué columna
+      // usa qué diccionario (p.ej. "DictionaryIndex": 0 -> ValueDicts.D0).
+      // Si esa info no está presente, probamos igual con D0, D1, D2... en orden.
+      const descriptorSelect = (resultData.descriptor && resultData.descriptor.Select) || [];
+
+      const filas = [];
+      let anterior = null;
+
+      for (const fila of dm0) {
+        let actual;
+        if (fila.C) {
+          if (fila.R !== undefined && anterior) {
+            actual = new Array(numCols);
+            let ci = 0;
+            for (let i = 0; i < numCols; i++) {
+              if (fila.R & (1 << i)) {
+                actual[i] = anterior[i];
+              } else {
+                actual[i] = fila.C[ci++];
+              }
+            }
+          } else {
+            actual = fila.C.slice(0, numCols);
+            while (actual.length < numCols) {
+              actual.push(anterior ? anterior[actual.length] : null);
+            }
+          }
+        } else {
+          actual = anterior ? anterior.slice() : new Array(numCols).fill(null);
+        }
+
+        // Resolver valores que en realidad son índices a un diccionario (ValueDicts)
+        for (let i = 0; i < numCols; i++) {
+          if (typeof actual[i] !== "number") continue;
+          const desc = descriptorSelect[i];
+          let dict = null;
+          if (desc && desc.DictionaryIndex !== undefined) {
+            dict = valueDicts["D" + desc.DictionaryIndex];
+          }
+          if (!dict) dict = valueDicts["D" + i]; // respaldo por orden
+          if (dict && dict[actual[i]] !== undefined) {
+            actual[i] = dict[actual[i]];
+          }
+        }
+
+        filas.push(actual);
+        anterior = actual;
+      }
+      return filas;
+    } catch (e) {
+      console.error("No se pudo decodificar la respuesta de Power BI:", e);
+      return [];
+    }
+  }
+
+  // --- COORDENADAS ---
+  function extraerCoordenadas(url) {
+    if (!url || typeof url !== "string") return null;
+    const regexWaze = /ll=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const regexMaps = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const regexMapsQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+
+    const match = url.match(regexWaze) || url.match(regexMaps) || url.match(regexMapsQ);
+    if (match) return { lat: match[1], lng: match[2], texto: `${match[1]}, ${match[2]}` };
+    return null;
+  }
+
+  // --- RENDER DE TARJETAS ---
+  function renderTarjeta(fila, contenedor) {
+    const [nombre, distrito, direccion, googleLink, wazeLink] = fila;
+
+    const linkParaCoords = wazeLink || googleLink;
+    const coords = extraerCoordenadas(linkParaCoords);
+
+    const nombreSeguro = escaparHTML(nombre || "Nombre no disponible");
+    const distritoSeguro = escaparHTML(distrito || "—");
+    const direccionSegura = escaparHTML(direccion || "Sin dirección registrada");
+
+    const coordsHTML = coords
+      ? `<div class="coords">${coords.texto}</div>`
+      : `<div class="coords no-disp">Coordenadas no disponibles</div>`;
+
+    let botonesMapa = "";
+    if (googleLink && String(googleLink).includes("http")) {
+      botonesMapa += `<a href="${escaparAtributo(googleLink)}" target="_blank" rel="noopener" class="btn-link">🗺️ Google Maps</a>`;
+    }
+    if (wazeLink && String(wazeLink).includes("http")) {
+      botonesMapa += `<a href="${escaparAtributo(wazeLink)}" target="_blank" rel="noopener" class="btn-link">🚗 Waze</a>`;
+    }
+    if (coords) {
+      const valorCopiar = coords.texto.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      botonesMapa += `<button class="btn-copiar" onclick="copiarAlPortapapeles('${valorCopiar}')">Copiar coordenadas</button>`;
+    }
+
+    const tarjeta = document.createElement("div");
+    tarjeta.className = "tarjeta-ce";
+    tarjeta.innerHTML = `
+      <h3>${nombreSeguro}</h3>
+      <div class="meta"><strong>Distrito:</strong> ${distritoSeguro}</div>
+      <div class="meta"><strong>Dirección:</strong> ${direccionSegura}</div>
+      ${coordsHTML}
+      <div class="acciones-btn">${botonesMapa}</div>
+    `;
+    contenedor.appendChild(tarjeta);
+  }
+
+  function escaparHTML(str) {
+    const div = document.createElement("div");
+    div.innerText = str;
+    return div.innerHTML;
+  }
+  function escaparAtributo(str) {
+    return String(str).replace(/"/g, "&quot;");
+  }
+
+  // --- MOTOR DE PETICIONES ---
+  async function hacerPeticion(bodyString) {
+    const response = await fetch(URL_API, {
+      headers: HEADERS_API,
+      body: bodyString,
+      method: "POST",
+      mode: "cors",
+      credentials: "omit"
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  }
+
+  // --- COPIAR AL PORTAPAPELES ---
+  function copiarAlPortapapeles(texto) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(texto)
+        .then(() => mostrarToast(`Copiado: ${texto}`))
+        .catch(() => fallbackCopiar(texto));
+    } else {
+      fallbackCopiar(texto);
+    }
+  }
+
+  function fallbackCopiar(texto, mensajePersonalizado) {
+    const textArea = document.createElement("textarea");
+    textArea.value = texto;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      const exitoso = document.execCommand('copy');
+      mostrarToast(exitoso ? (mensajePersonalizado || `Copiado: ${texto}`) : "❌ Error al copiar");
+    } catch (err) {
+      mostrarToast("❌ El navegador bloqueó la copia");
+    }
+
+    document.body.removeChild(textArea);
+  }
+
+  function mostrarToast(mensaje) {
+    const toast = document.getElementById("toast");
+    toast.innerText = mensaje;
+    toast.className = "show";
+    setTimeout(function () { toast.className = toast.className.replace("show", ""); }, 2500);
+  }
+
+  // ==========================================
+  // AUTOCOMPLETADO DE MUNICIPIOS
+  // ==========================================
+  const MAX_SUGERENCIAS = 30;
+  let sugerenciasActuales = [];
+  let indiceActivo = -1;
+
+  const inputMunicipio = document.getElementById("municipioInput");
+  const cajaSugerencias = document.getElementById("sugerencias");
+
+  function normalizarTexto(texto) {
+    if (!texto) return "";
+    return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  function actualizarSugerencias() {
+    const texto = inputMunicipio.value.trim();
+    indiceActivo = -1;
+    const query = normalizarTexto(texto);
+
+    if (!query || !diccionarioMunicipios.length) {
+      cajaSugerencias.classList.remove("show");
+      cajaSugerencias.innerHTML = "";
+      sugerenciasActuales = [];
+      return;
+    }
+
+    const coincidencias = diccionarioMunicipios.filter(m => normalizarTexto(m).includes(query));
+    sugerenciasActuales = coincidencias.slice(0, MAX_SUGERENCIAS);
+
+    if (sugerenciasActuales.length === 0) {
+      cajaSugerencias.innerHTML = `<div class="sug-info">Sin coincidencias para "${texto}"</div>`;
+      cajaSugerencias.classList.add("show");
+      return;
+    }
+
+    let html = "";
+    if (coincidencias.length > MAX_SUGERENCIAS) {
+      html += `<div class="sug-info">Mostrando ${MAX_SUGERENCIAS} de ${coincidencias.length} — sigue escribiendo para acotar</div>`;
+    }
+    sugerenciasActuales.forEach((m, i) => {
+      html += `<div class="sugerencia-item" data-index="${i}" onclick="seleccionarSugerencia(${i})">${escaparHTML(m)}</div>`;
+    });
+
+    cajaSugerencias.innerHTML = html;
+    cajaSugerencias.classList.add("show");
+  }
+
+  function seleccionarSugerencia(i) {
+    const municipio = sugerenciasActuales[i];
+    if (!municipio) return;
+    inputMunicipio.value = municipio;
+    cajaSugerencias.classList.remove("show");
+    cajaSugerencias.innerHTML = "";
+    sugerenciasActuales = [];
+    buscarPorMunicipio();
+  }
+
+  function resaltarActiva() {
+    const items = cajaSugerencias.querySelectorAll(".sugerencia-item");
+    items.forEach((el, i) => el.classList.toggle("activa", i === indiceActivo));
+    if (indiceActivo >= 0 && items[indiceActivo]) {
+      items[indiceActivo].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  inputMunicipio.addEventListener("input", actualizarSugerencias);
+
+  inputMunicipio.addEventListener("keydown", function (e) {
+    const listaVisible = cajaSugerencias.classList.contains("show") && sugerenciasActuales.length > 0;
+
+    if (listaVisible && e.key === "ArrowDown") {
+      e.preventDefault();
+      indiceActivo = Math.min(indiceActivo + 1, sugerenciasActuales.length - 1);
+      resaltarActiva();
+      return;
+    }
+    if (listaVisible && e.key === "ArrowUp") {
+      e.preventDefault();
+      indiceActivo = Math.max(indiceActivo - 1, 0);
+      resaltarActiva();
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (listaVisible && indiceActivo >= 0) {
+        seleccionarSugerencia(indiceActivo);
+      } else {
+        cajaSugerencias.classList.remove("show");
+        buscarPorMunicipio();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      cajaSugerencias.classList.remove("show");
+    }
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!cajaSugerencias.contains(e.target) && e.target !== inputMunicipio) {
+      cajaSugerencias.classList.remove("show");
+    }
+  });
+</script>
+</body>
+</html>
