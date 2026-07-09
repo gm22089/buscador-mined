@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Coordenadas por Municipio — MINED</title>
+<title>Coordenadas por Municipio/Distrito — MINED</title>
 <style>
   :root{
     --azul-inst: #14375E;
@@ -153,6 +153,9 @@
     cursor: pointer;
     border-bottom: 1px solid var(--linea);
     line-height: 1.35;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
   .sugerencia-item:last-child{ border-bottom: none; }
   .sugerencia-item:hover, .sugerencia-item.activa{
@@ -165,6 +168,17 @@
     font-style: italic;
     border-bottom: 1px solid var(--linea);
   }
+  
+  .badge-tipo {
+    font-size: 10px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-municipio { background: var(--azul-inst); color: #fff; }
+  .badge-distrito { background: var(--oro-suave); color: #7A5A18; border: 1px solid #DFC98A; }
 
   .btn-buscar{
     padding: 13px 22px;
@@ -318,25 +332,25 @@
   <div class="marca">
     <span class="eyebrow">Consulta de datos oficiales</span>
   </div>
-  <h1>Coordenadas de Centros Escolares por Municipio</h1>
-  <p class="sub">Busca todos los Centros Educativos de un municipio y obtén sus coordenadas listas para abrir en Waze o Google Maps.</p>
+  <h1>Coordenadas de CEs por Municipio o Distrito</h1>
+  <p class="sub">Busca todos los Centros Educativos de una zona específica y obtén sus coordenadas listas para abrir en Waze o Google Maps.</p>
 
   <nav class="subnav">
     <a href="index.html">🔎 Buscar por código o nombre</a>
-    <a href="coordenadas.html" class="activa">📍 Buscar por municipio</a>
+    <a href="coordenadas.html" class="activa">📍 Buscar por zona (Muni/Dist)</a>
   </nav>
 </header>
 
 <main>
   <div class="buscador">
     <div class="campo-busqueda">
-      <input type="text" id="municipioInput" placeholder="Ejemplo: AHUACHAPAN CENTRO" disabled autocomplete="off">
+      <input type="text" id="lugarInput" placeholder="Ejemplo: SANTA ANA CENTRO o APANECA" disabled autocomplete="off">
       <div id="sugerencias" class="sugerencias"></div>
     </div>
-    <button id="btnBuscar" class="btn-buscar" onclick="buscarPorMunicipio()" disabled>Buscar coordenadas</button>
+    <button id="btnBuscar" class="btn-buscar" onclick="buscarPorLugar()" disabled>Buscar coordenadas</button>
   </div>
 
-  <div id="estadoDiccionario">⏳ Descargando lista de municipios desde el MINED...</div>
+  <div id="estadoDiccionario">⏳ Descargando listado de lugares desde el MINED...</div>
   <p id="estadoText"></p>
   <p id="resumenResultados"></p>
 
@@ -346,7 +360,7 @@
 <div id="toast"></div>
 
 <script>
-  let diccionarioMunicipios = [];
+  let diccionarioLugares = []; // Guardará objetos: { nombre: "APANECA", tipo: "Distrito" }
 
   const HEADERS_API = {
     "Accept": "application/json, text/plain, */*",
@@ -360,115 +374,114 @@
   const MAX_RESULTADOS = 3000;
 
   // ==========================================
-  // PASO 0: DESCARGAR LISTA DE MUNICIPIOS
+  // PASO 0: DESCARGAR MUNICIPIOS Y DISTRITOS
   // ==========================================
   window.onload = async function () {
+    // Consulta 1: Todos los Municipios
     const bodyMunicipios = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"},"Name":"CE_2024.Municipio"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"17095abaaae058a6f737"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+    
+    // Consulta 2: Todos los Distritos (Usando el visualId correcto de tu index)
+    const bodyDistritos = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"},"Name":"CE_2024.Distrito"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"b917b9f95449267164bb"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
 
     try {
-      const respuesta = await hacerPeticion(bodyMunicipios);
+      // Lanzamos ambas peticiones al mismo tiempo para no hacer esperar al usuario
+      const [respMuni, respDist] = await Promise.all([
+        hacerPeticion(bodyMunicipios),
+        hacerPeticion(bodyDistritos)
+      ]);
 
-      // 🔍 DIAGNÓSTICO: deja la respuesta cruda visible en la consola (F12)
-      // para poder ver exactamente qué estructura está devolviendo Power BI.
-      console.log("Respuesta cruda de Power BI (municipios):", respuesta);
+      // Función auxiliar para extraer los nombres de las respuestas de PowerBI
+      function extraerNombres(respuesta) {
+        let nombres = decodificarFilas(respuesta, 1)
+          .map(f => (f && f[0] !== undefined && f[0] !== null) ? String(f[0]) : null)
+          .filter(Boolean)
+          .filter(v => !/^\d+$/.test(v));
 
-      if (respuesta && respuesta.error) {
-        console.error("Power BI rechazó la consulta:", respuesta.error);
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Power BI rechazó la consulta. Revisa la consola (F12) para ver el detalle del error.</span>`;
-        return;
-      }
-
-      let nombres = [];
-
-      // Intento 1: decodificación estructurada (con soporte de diccionario de valores)
-      const filas = decodificarFilas(respuesta, 1);
-      nombres = filas
-        .map(f => (f && f[0] !== undefined && f[0] !== null) ? String(f[0]) : null)
-        .filter(Boolean)
-        .filter(v => !/^\d+$/.test(v)); // descarta si vino un índice numérico sin resolver
-
-      // Intento 2 (respaldo): si el decodificador estructurado no encontró nada,
-      // busca directamente en el texto crudo cualquier bloque de mayúsculas que
-      // luzca como nombre de municipio (mismo truco que ya usa index.html).
-      if (nombres.length === 0) {
-        console.warn("Decodificación estructurada vacía, probando extracción por texto crudo…");
-        const textoCrudo = JSON.stringify(respuesta);
-        const regexMunicipios = /"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .\-]{2,45})"/g;
-        const vistos = new Set();
-        let m;
-        while ((m = regexMunicipios.exec(textoCrudo)) !== null) {
-          vistos.add(m[1].trim());
+        if (nombres.length === 0) {
+          const textoCrudo = JSON.stringify(respuesta);
+          const regex = /"([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ0-9 .\-]{2,45})"/g;
+          const vistos = new Set();
+          let m;
+          while ((m = regex.exec(textoCrudo)) !== null) vistos.add(m[1].trim());
+          nombres = [...vistos];
         }
-        nombres = [...vistos];
+        return [...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es'));
       }
 
-      diccionarioMunicipios = [...new Set(nombres)].sort((a, b) => a.localeCompare(b, 'es'));
+      const listaMunicipios = extraerNombres(respMuni).map(n => ({ nombre: n, tipo: "Municipio" }));
+      const listaDistritos = extraerNombres(respDist).map(n => ({ nombre: n, tipo: "Distrito" }));
 
-      if (diccionarioMunicipios.length > 0) {
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ ${diccionarioMunicipios.length} municipios disponibles. Escribe uno para empezar.</span>`;
-        document.getElementById("municipioInput").disabled = false;
+      // Unimos ambas listas en un solo mega-diccionario
+      diccionarioLugares = [...listaMunicipios, ...listaDistritos];
+
+      if (diccionarioLugares.length > 0) {
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ Cargados ${listaMunicipios.length} municipios y ${listaDistritos.length} distritos. Escribe una zona para empezar.</span>`;
+        document.getElementById("lugarInput").disabled = false;
         document.getElementById("btnBuscar").disabled = false;
-        document.getElementById("municipioInput").focus();
+        document.getElementById("lugarInput").focus();
       } else {
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ No se pudo leer la lista de municipios. Abre la consola (F12 → Console) y copia lo que aparece ahí; también revisa la pestaña Network para ver la respuesta de la petición a "querydata".</span>`;
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ No se pudo leer la lista de zonas. Revisa la conexión o la consola (F12).</span>`;
       }
     } catch (error) {
-      console.error("Error al descargar municipios:", error);
-      document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar la lista de municipios. Revisa la consola (F12) para más detalle.</span>`;
+      console.error("Error al descargar zonas:", error);
+      document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar la lista de zonas. Revisa la consola (F12).</span>`;
     }
   };
 
   // ==========================================
   // BÚSQUEDA PRINCIPAL
   // ==========================================
-  async function buscarPorMunicipio() {
-    const textoInput = document.getElementById("municipioInput").value.trim();
+  async function buscarPorLugar() {
+    const textoInput = document.getElementById("lugarInput").value.trim();
     const estadoText = document.getElementById("estadoText");
     const resumen = document.getElementById("resumenResultados");
     const grid = document.getElementById("resultadosGrid");
     const btnBuscar = document.getElementById("btnBuscar");
 
     if (!textoInput) {
-      estadoText.innerText = "Escribe el nombre de un municipio antes de buscar.";
+      estadoText.innerText = "Escribe el nombre de un municipio o distrito antes de buscar.";
       estadoText.className = "error";
       return;
     }
 
-    // Encontrar la coincidencia exacta (o la más cercana) en el diccionario
     const query = normalizarTexto(textoInput);
-    let municipio = diccionarioMunicipios.find(m => normalizarTexto(m) === query);
-    if (!municipio) {
-      municipio = diccionarioMunicipios.find(m => normalizarTexto(m).includes(query));
+    
+    let lugar = diccionarioLugares.find(l => normalizarTexto(l.nombre) === query);
+    if (!lugar) {
+      lugar = diccionarioLugares.find(l => normalizarTexto(l.nombre).includes(query));
     }
 
-    if (!municipio) {
-      estadoText.innerText = `❌ No se encontró ningún municipio parecido a "${textoInput}".`;
+    if (!lugar) {
+      estadoText.innerText = `❌ No se encontró ningún lugar parecido a "${textoInput}".`;
       estadoText.className = "error";
       resumen.innerText = "";
       grid.innerHTML = "";
       return;
     }
 
-    estadoText.innerHTML = `Buscando Centros Educativos en <strong>${municipio}</strong>…`;
+    document.getElementById("lugarInput").value = lugar.nombre;
+
+    estadoText.innerHTML = `Buscando Centros Educativos en el <strong>${lugar.tipo} de ${lugar.nombre}</strong>…`;
     estadoText.className = "";
     resumen.innerText = "";
     grid.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
     btnBuscar.disabled = true;
 
     try {
-      const body = generarBodyMunicipio(municipio);
+      const body = generarBodyLugar(lugar);
       const respuesta = await hacerPeticion(body);
-      // Columnas: 0 Nombre, 1 Distrito, 2 Dirección, 3 GoogleMapsLink, 4 WazeLink
-      const filas = decodificarFilas(respuesta, 5);
+      
+      // ¡AQUÍ ESTÁ EL CAMBIO! Ahora decodificamos 6 columnas (se agregó el Código al inicio)
+      const filas = decodificarFilas(respuesta, 6); 
 
       grid.innerHTML = "";
 
       if (filas.length === 0) {
-        estadoText.innerText = `No se encontraron Centros Educativos para "${municipio}".`;
+        estadoText.innerText = `No se encontraron Centros Educativos para el ${lugar.tipo} "${lugar.nombre}".`;
         estadoText.className = "error";
       } else {
         estadoText.innerText = "";
-        resumen.innerText = `${filas.length} Centro(s) Educativo(s) encontrados en ${municipio}`;
+        resumen.innerText = `${filas.length} Centro(s) Educativo(s) encontrados en ${lugar.nombre}`;
         filas.slice(0, MAX_RESULTADOS).forEach(fila => renderTarjeta(fila, grid));
       }
     } catch (error) {
@@ -481,28 +494,22 @@
     }
   }
 
-  function generarBodyMunicipio(municipio) {
-    return `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"},"Name":"CE_2024.Nombre"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"},"Name":"CE_2024.Distrito"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Dirección"},"Name":"CE_2024.Direccion"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"GoogleMapsLink"},"Name":"CE_2024.GMaps"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"WazeLink"},"Name":"CE_2024.Waze"}],"Where":[{"Condition":{"In":{"Expressions":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"}}],"Values":[[{"Literal":{"Value":"'${municipio.replace(/'/g, "''")}'"}}]]}}}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0,1,2,3,4]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":${MAX_RESULTADOS}}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"0118ca5223a73939f738"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
+  // Generador dinámico: decide si filtra por la columna 'Municipio' o por 'Distrito'
+function generarBodyLugar(lugar) {
+    const propiedadAFiltrar = lugar.tipo === "Municipio" ? "Municipio" : "Distrito";
+    
+    // Se agregó la columna "Código" al bloque Select y al bloque Projections
+    return `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Código"},"Name":"CE_2024.Codigo"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"},"Name":"CE_2024.Nombre"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"},"Name":"CE_2024.Distrito"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Dirección"},"Name":"CE_2024.Direccion"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"GoogleMapsLink"},"Name":"CE_2024.GMaps"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"WazeLink"},"Name":"CE_2024.Waze"}],"Where":[{"Condition":{"In":{"Expressions":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"${propiedadAFiltrar}"}}],"Values":[[{"Literal":{"Value":"'${lugar.nombre.replace(/'/g, "''")}'"}}]]}}}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0,1,2,3,4,5]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":${MAX_RESULTADOS}}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"0118ca5223a73939f738"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
   }
 
   // ==========================================
   // DECODIFICACIÓN DE RESPUESTAS DE POWER BI
   // ==========================================
-  // Power BI comprime filas repetidas: cuando una fila trae el mismo valor
-  // que la anterior en una columna, la omite y usa un bitmask "R" para
-  // indicar cuáles columnas se repiten. Esta función reconstruye cada fila
-  // completa a partir de esas filas comprimidas. Es un decodificador de
-  // mejor esfuerzo: si el formato cambia, deja el campo como null en vez
-  // de fallar toda la búsqueda.
   function decodificarFilas(data, numCols) {
     try {
       const resultData = data.results[0].result.data;
       const dm0 = resultData.dsr.DS[0].PH[0].DM0;
       const valueDicts = resultData.dsr.DS[0].ValueDicts || {};
-
-      // Power BI a veces expone, en el descriptor de la consulta, qué columna
-      // usa qué diccionario (p.ej. "DictionaryIndex": 0 -> ValueDicts.D0).
-      // Si esa info no está presente, probamos igual con D0, D1, D2... en orden.
       const descriptorSelect = (resultData.descriptor && resultData.descriptor.Select) || [];
 
       const filas = [];
@@ -531,7 +538,6 @@
           actual = anterior ? anterior.slice() : new Array(numCols).fill(null);
         }
 
-        // Resolver valores que en realidad son índices a un diccionario (ValueDicts)
         for (let i = 0; i < numCols; i++) {
           if (typeof actual[i] !== "number") continue;
           const desc = descriptorSelect[i];
@@ -539,7 +545,7 @@
           if (desc && desc.DictionaryIndex !== undefined) {
             dict = valueDicts["D" + desc.DictionaryIndex];
           }
-          if (!dict) dict = valueDicts["D" + i]; // respaldo por orden
+          if (!dict) dict = valueDicts["D" + i];
           if (dict && dict[actual[i]] !== undefined) {
             actual[i] = dict[actual[i]];
           }
@@ -568,12 +574,14 @@
   }
 
   // --- RENDER DE TARJETAS ---
+  // --- RENDER DE TARJETAS ---
   function renderTarjeta(fila, contenedor) {
-    const [nombre, distrito, direccion, googleLink, wazeLink] = fila;
+    const [codigo, nombre, distrito, direccion, googleLink, wazeLink] = fila;
 
     const linkParaCoords = wazeLink || googleLink;
     const coords = extraerCoordenadas(linkParaCoords);
 
+    const codigoSeguro = escaparHTML(codigo || "Sin código");
     const nombreSeguro = escaparHTML(nombre || "Nombre no disponible");
     const distritoSeguro = escaparHTML(distrito || "—");
     const direccionSegura = escaparHTML(direccion || "Sin dirección registrada");
@@ -596,8 +604,19 @@
 
     const tarjeta = document.createElement("div");
     tarjeta.className = "tarjeta-ce";
+    
+    // --- CAMBIO APLICADO AQUÍ ---
+    // Usamos flexbox para que el código y el nombre no se mezclen.
+    // El span del código ahora tiene estilo de botón, cursor de mano y evento onclick para copiar.
     tarjeta.innerHTML = `
-      <h3>${nombreSeguro}</h3>
+      <h3 style="display: flex; align-items: flex-start; gap: 8px;">
+        <span 
+          onclick="copiarAlPortapapeles('${codigoSeguro}')" 
+          title="Haz clic para copiar el código"
+          style="background: #EAF0F6; color: var(--azul-inst); padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 13.5px; cursor: pointer; user-select: all; border: 1px solid #C9D6E3; flex-shrink: 0;"
+        >${codigoSeguro}</span>
+        <span style="flex: 1; padding-top: 1px;">${nombreSeguro}</span>
+      </h3>
       <div class="meta"><strong>Distrito:</strong> ${distritoSeguro}</div>
       <div class="meta"><strong>Dirección:</strong> ${direccionSegura}</div>
       ${coordsHTML}
@@ -669,13 +688,13 @@
   }
 
   // ==========================================
-  // AUTOCOMPLETADO DE MUNICIPIOS
+  // AUTOCOMPLETADO INTELIGENTE (MUNICIPIOS Y DISTRITOS)
   // ==========================================
-  const MAX_SUGERENCIAS = 30;
+  const MAX_SUGERENCIAS = 40;
   let sugerenciasActuales = [];
   let indiceActivo = -1;
 
-  const inputMunicipio = document.getElementById("municipioInput");
+  const inputLugar = document.getElementById("lugarInput");
   const cajaSugerencias = document.getElementById("sugerencias");
 
   function normalizarTexto(texto) {
@@ -684,18 +703,18 @@
   }
 
   function actualizarSugerencias() {
-    const texto = inputMunicipio.value.trim();
+    const texto = inputLugar.value.trim();
     indiceActivo = -1;
     const query = normalizarTexto(texto);
 
-    if (!query || !diccionarioMunicipios.length) {
+    if (!query || !diccionarioLugares.length) {
       cajaSugerencias.classList.remove("show");
       cajaSugerencias.innerHTML = "";
       sugerenciasActuales = [];
       return;
     }
 
-    const coincidencias = diccionarioMunicipios.filter(m => normalizarTexto(m).includes(query));
+    const coincidencias = diccionarioLugares.filter(l => normalizarTexto(l.nombre).includes(query));
     sugerenciasActuales = coincidencias.slice(0, MAX_SUGERENCIAS);
 
     if (sugerenciasActuales.length === 0) {
@@ -708,8 +727,15 @@
     if (coincidencias.length > MAX_SUGERENCIAS) {
       html += `<div class="sug-info">Mostrando ${MAX_SUGERENCIAS} de ${coincidencias.length} — sigue escribiendo para acotar</div>`;
     }
-    sugerenciasActuales.forEach((m, i) => {
-      html += `<div class="sugerencia-item" data-index="${i}" onclick="seleccionarSugerencia(${i})">${escaparHTML(m)}</div>`;
+    
+    // Renderizamos las sugerencias con una pequeña etiqueta que dice "Municipio" o "Distrito"
+    sugerenciasActuales.forEach((lugar, i) => {
+      const claseBadge = lugar.tipo === "Municipio" ? "badge-municipio" : "badge-distrito";
+      html += `
+        <div class="sugerencia-item" data-index="${i}" onclick="seleccionarSugerencia(${i})">
+          <span>${escaparHTML(lugar.nombre)}</span>
+          <span class="badge-tipo ${claseBadge}">${lugar.tipo}</span>
+        </div>`;
     });
 
     cajaSugerencias.innerHTML = html;
@@ -717,13 +743,13 @@
   }
 
   function seleccionarSugerencia(i) {
-    const municipio = sugerenciasActuales[i];
-    if (!municipio) return;
-    inputMunicipio.value = municipio;
+    const lugar = sugerenciasActuales[i];
+    if (!lugar) return;
+    inputLugar.value = lugar.nombre;
     cajaSugerencias.classList.remove("show");
     cajaSugerencias.innerHTML = "";
     sugerenciasActuales = [];
-    buscarPorMunicipio();
+    buscarPorLugar();
   }
 
   function resaltarActiva() {
@@ -734,9 +760,9 @@
     }
   }
 
-  inputMunicipio.addEventListener("input", actualizarSugerencias);
+  inputLugar.addEventListener("input", actualizarSugerencias);
 
-  inputMunicipio.addEventListener("keydown", function (e) {
+  inputLugar.addEventListener("keydown", function (e) {
     const listaVisible = cajaSugerencias.classList.contains("show") && sugerenciasActuales.length > 0;
 
     if (listaVisible && e.key === "ArrowDown") {
@@ -757,7 +783,7 @@
         seleccionarSugerencia(indiceActivo);
       } else {
         cajaSugerencias.classList.remove("show");
-        buscarPorMunicipio();
+        buscarPorLugar();
       }
       return;
     }
@@ -767,7 +793,7 @@
   });
 
   document.addEventListener("click", function (e) {
-    if (!cajaSugerencias.contains(e.target) && e.target !== inputMunicipio) {
+    if (!cajaSugerencias.contains(e.target) && e.target !== inputLugar) {
       cajaSugerencias.classList.remove("show");
     }
   });
