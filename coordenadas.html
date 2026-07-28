@@ -481,8 +481,12 @@
         estadoText.className = "error";
       } else {
         estadoText.innerText = "";
-        resumen.innerText = `${filas.length} Centro(s) Educativo(s) encontrados en ${lugar.nombre}`;
-        filas.slice(0, MAX_RESULTADOS).forEach(fila => renderTarjeta(fila, grid));
+        resumen.innerText = `${filas.length} Centro(s) Educativo(s) encontrados en ${lugar.nombre} (Ordenados por cercanía en ruta)`;
+        
+        // ¡Magia aplicada aquí!
+        const filasOrdenadas = ordenarPorCercania(filas);
+        
+        filasOrdenadas.slice(0, MAX_RESULTADOS).forEach(fila => renderTarjeta(fila, grid));
       }
     } catch (error) {
       console.error(error);
@@ -797,6 +801,75 @@ function generarBodyLugar(lugar) {
       cajaSugerencias.classList.remove("show");
     }
   });
+
+  // ==========================================
+  // CÁLCULO DE DISTANCIAS Y ORDENAMIENTO (VECINO MÁS CERCANO)
+  // ==========================================
+  function calcularDistancia(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radio de la Tierra en kilómetros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Devuelve la distancia en km
+  }
+
+  function ordenarPorCercania(filas) {
+    const filasConCoords = [];
+    const filasSinCoords = [];
+
+    // 1. Extraemos las coordenadas antes de pintar las tarjetas
+    filas.forEach(fila => {
+      const wazeLink = fila[5]; // Según la estructura de tu código
+      const googleLink = fila[4];
+      const link = wazeLink || googleLink;
+      
+      const coords = extraerCoordenadas(link);
+      if (coords) {
+        filasConCoords.push({ 
+          filaOriginal: fila, 
+          lat: parseFloat(coords.lat), 
+          lng: parseFloat(coords.lng) 
+        });
+      } else {
+        filasSinCoords.push(fila); // Si no hay link de mapa, se va al final
+      }
+    });
+
+    if (filasConCoords.length === 0) return filas;
+
+    const rutaOrdenada = [];
+    
+    // 2. Tomamos el primer CE como nuestro "Punto de Partida"
+    let puntoActual = filasConCoords.shift();
+    rutaOrdenada.push(puntoActual.filaOriginal);
+
+    // 3. Buscamos iterativamente el más cercano
+    while (filasConCoords.length > 0) {
+      let indexMasCercano = 0;
+      let distanciaMinima = Infinity;
+
+      for (let i = 0; i < filasConCoords.length; i++) {
+        const candidato = filasConCoords[i];
+        const dist = calcularDistancia(puntoActual.lat, puntoActual.lng, candidato.lat, candidato.lng);
+        
+        if (dist < distanciaMinima) {
+          distanciaMinima = dist;
+          indexMasCercano = i;
+        }
+      }
+
+      // Movemos el más cercano a nuestra ruta ordenada y lo hacemos nuestro nuevo punto de partida
+      puntoActual = filasConCoords.splice(indexMasCercano, 1)[0];
+      rutaOrdenada.push(puntoActual.filaOriginal);
+    }
+
+    // 4. Juntamos la ruta ordenada con los CEs que no tenían coordenadas
+    return rutaOrdenada.concat(filasSinCoords);
+  }
+
 </script>
 </body>
 </html>
