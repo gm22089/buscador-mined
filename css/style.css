@@ -1,4 +1,6 @@
-
+/* ==========================================
+     1. VARIABLES Y RESET GENERAL
+     ========================================== */
   :root{
     --azul-inst: #14375E;
     --azul-inst-dark: #0C2740;
@@ -23,6 +25,9 @@
     padding: 0 0 60px 0;
   }
 
+  /* ==========================================
+     2. CABECERA Y NAVEGACIÓN (COMPARTIDO)
+     ========================================== */
   header.top{
     background: linear-gradient(135deg, var(--azul-inst) 0%, var(--azul-inst-dark) 100%);
     color: #fff;
@@ -63,7 +68,6 @@
     font-size: 13.5px;
   }
 
-  /* --- Subnavegación compartida entre ambas páginas --- */
   .subnav{
     max-width: 1040px;
     margin: 18px auto 0;
@@ -95,6 +99,9 @@
     padding: 0 24px;
   }
 
+  /* ==========================================
+     3. BUSCADOR PRINCIPAL (COMPARTIDO)
+     ========================================== */
   .buscador{
     background: var(--panel);
     border-radius: 10px;
@@ -124,6 +131,7 @@
     border-color: var(--azul-inst);
     box-shadow: 0 0 0 3px rgba(20,55,94,0.12);
   }
+  .buscador input:disabled{ background: #EFEEE9; color: #A3A099; }
 
   .sugerencias{
     display: none;
@@ -147,6 +155,7 @@
     cursor: pointer;
     border-bottom: 1px solid var(--linea);
     line-height: 1.35;
+    /* Eliminamos el display: flex y el justify-content que causaban el espacio */
   }
   .sugerencia-item:last-child{ border-bottom: none; }
   .sugerencia-item:hover, .sugerencia-item.activa{
@@ -191,6 +200,7 @@
     font-weight: 600;
   }
   .estado-ok { color: var(--verde); }
+  .error { color: var(--rojo); }
 
   #estadoText{
     max-width: 1040px;
@@ -200,6 +210,63 @@
   }
   #estadoText.error{ color: var(--rojo); font-weight: 600; }
 
+  /* ==========================================
+     4. ELEMENTOS INTERACTIVOS (COMPARTIDO)
+     ========================================== */
+  .acciones-btn{ display: flex; gap: 6px; flex-shrink: 0; }
+
+  .btn-copiar, .btn-link{
+    border: 1px solid #C7C4B8;
+    padding: 6px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11.5px;
+    white-space: nowrap;
+    font-family: inherit;
+    text-decoration: none;
+  }
+  .btn-copiar{ background: #FAF9F6; color: var(--texto); }
+  .btn-copiar:hover{ background: var(--linea); }
+  .btn-link{ background: var(--oro-suave); color: #7A5A18; border-color: #DFC98A; font-weight: 600; }
+  .btn-link:hover{ background: #EEDDAE; }
+
+  .skeleton{
+    border-radius: 5px;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #EDEBE4 25%, #F5F4F0 37%, #EDEBE4 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  .skeleton.tarjeta { height: 110px; border-radius: 10px; }
+  .skeleton.fila { height: 42px; }
+  
+  @keyframes shimmer{
+    0%{ background-position: 100% 50%; }
+    100%{ background-position: 0 50%; }
+  }
+
+  #toast{
+    visibility: hidden;
+    min-width: 260px;
+    background: var(--azul-inst-dark);
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 13px 16px;
+    position: fixed;
+    z-index: 10;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 13.5px;
+  }
+  #toast.show{ visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.7s; }
+  @keyframes fadein{ from{bottom:0; opacity:0;} to{bottom:30px; opacity:1;} }
+  @keyframes fadeout{ from{bottom:30px; opacity:1;} to{bottom:0; opacity:0;} }
+
+  /* ==========================================
+     5. ESTILOS ÚNICOS: INDEX (Buscador Maestro)
+     ========================================== */
   .dashboard{
     display: none;
     grid-template-columns: 1.5fr 1fr;
@@ -255,23 +322,6 @@
     font-style: italic;
   }
 
-  .acciones-btn{ display: flex; gap: 6px; flex-shrink: 0; }
-
-  .btn-copiar, .btn-link{
-    border: 1px solid #C7C4B8;
-    padding: 6px 10px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 11.5px;
-    white-space: nowrap;
-    font-family: inherit;
-    text-decoration: none;
-  }
-  .btn-copiar{ background: #FAF9F6; color: var(--texto); }
-  .btn-copiar:hover{ background: var(--linea); }
-  .btn-link{ background: var(--oro-suave); color: #7A5A18; border-color: #DFC98A; font-weight: 600; }
-  .btn-link:hover{ background: #EEDDAE; }
-
   .btn-super-fetch{
     background: var(--verde);
     color: #fff;
@@ -299,207 +349,9 @@
     font-family: ui-monospace, "SF Mono", Consolas, monospace;
   }
 
-  .skeleton{
-    height: 42px;
-    border-radius: 5px;
-    margin-bottom: 8px;
-    background: linear-gradient(90deg, #EDEBE4 25%, #F5F4F0 37%, #EDEBE4 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-  @keyframes shimmer{
-    0%{ background-position: 100% 50%; }
-    100%{ background-position: 0 50%; }
-  }
-
-  #toast{
-    visibility: hidden;
-    min-width: 260px;
-    background: var(--azul-inst-dark);
-    color: #fff;
-    text-align: center;
-    border-radius: 6px;
-    padding: 13px 16px;
-    position: fixed;
-    z-index: 10;
-    left: 50%;
-    bottom: 30px;
-    transform: translateX(-50%);
-    font-size: 13.5px;
-  }
-  #toast.show{ visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.7s; }
-  @keyframes fadein{ from{bottom:0; opacity:0;} to{bottom:30px; opacity:1;} }
-  @keyframes fadeout{ from{bottom:30px; opacity:1;} to{bottom:0; opacity:0;} }
-
-  @media (max-width: 760px){
-    .dashboard{ grid-template-columns: 1fr; }
-    .buscador{ flex-direction: column; }
-  }
-
-    :root{
-    --azul-inst: #14375E;
-    --azul-inst-dark: #0C2740;
-    --oro: #B8892B;
-    --oro-suave: #F4E9D2;
-    --fondo: #F5F4F0;
-    --panel: #FFFFFF;
-    --linea: #E2DFD6;
-    --texto: #23282D;
-    --texto-suave: #63625C;
-    --verde: #1E7145;
-    --rojo: #A3331E;
-  }
-
-  *{ box-sizing: border-box; }
-
-  body{
-    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-    background: var(--fondo);
-    color: var(--texto);
-    margin: 0;
-    padding: 0 0 60px 0;
-  }
-
-  header.top{
-    background: linear-gradient(135deg, var(--azul-inst) 0%, var(--azul-inst-dark) 100%);
-    color: #fff;
-    padding: 28px 24px 20px;
-    border-bottom: 4px solid var(--oro);
-  }
-
-  header.top .marca{
-    max-width: 1040px;
-    margin: 0 auto;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
-
-  header.top .marca .eyebrow{
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--oro-suave);
-    font-weight: 600;
-  }
-
-  header.top h1{
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 26px;
-    margin: 4px 0 0 0;
-    font-weight: 700;
-    max-width: 1040px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  header.top p.sub{
-    max-width: 1040px;
-    margin: 6px auto 0;
-    color: #C9D6E3;
-    font-size: 13.5px;
-  }
-
-  .subnav{
-    max-width: 1040px;
-    margin: 18px auto 0;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .subnav a{
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 9px 16px;
-    border-radius: 999px;
-    color: #C9D6E3;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.14);
-    transition: background 0.15s ease, color 0.15s ease;
-  }
-  .subnav a:hover{ background: rgba(255,255,255,0.14); color: #fff; }
-  .subnav a.activa{
-    background: var(--oro);
-    color: #2A1E05;
-    border-color: var(--oro);
-  }
-
-  main{
-    max-width: 1040px;
-    margin: -20px auto 0;
-    padding: 0 24px;
-  }
-
-  .buscador{
-    background: var(--panel);
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(12,39,64,0.14);
-    padding: 18px;
-    display: flex;
-    gap: 10px;
-    position: relative;
-  }
-
-  .campo-busqueda{
-    position: relative;
-    flex-grow: 1;
-  }
-
-  .buscador input{
-    width: 100%;
-    padding: 13px 14px;
-    font-size: 14px;
-    border: 1px solid #C7C4B8;
-    border-radius: 6px;
-    color: var(--texto);
-    background: #FBFAF7;
-  }
-  .buscador input:focus{
-    outline: none;
-    border-color: var(--azul-inst);
-    box-shadow: 0 0 0 3px rgba(20,55,94,0.12);
-  }
-  .buscador input:disabled{ background: #EFEEE9; color: #A3A099; }
-
-  .sugerencias{
-    display: none;
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    background: var(--panel);
-    border: 1px solid var(--linea);
-    border-radius: 8px;
-    box-shadow: 0 10px 28px rgba(12,39,64,0.18);
-    max-height: 320px;
-    overflow-y: auto;
-    z-index: 20;
-  }
-  .sugerencias.show{ display: block; }
-
-  .sugerencia-item{
-    padding: 10px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    border-bottom: 1px solid var(--linea);
-    line-height: 1.35;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .sugerencia-item:last-child{ border-bottom: none; }
-  .sugerencia-item:hover, .sugerencia-item.activa{
-    background: var(--oro-suave);
-  }
-  .sugerencias .sug-info{
-    padding: 8px 14px;
-    font-size: 11.5px;
-    color: var(--texto-suave);
-    font-style: italic;
-    border-bottom: 1px solid var(--linea);
-  }
-  
+  /* ==========================================
+     6. ESTILOS ÚNICOS: COORDENADAS
+     ========================================== */
   .badge-tipo {
     font-size: 10px;
     padding: 3px 6px;
@@ -510,39 +362,6 @@
   }
   .badge-municipio { background: var(--azul-inst); color: #fff; }
   .badge-distrito { background: var(--oro-suave); color: #7A5A18; border: 1px solid #DFC98A; }
-
-  .btn-buscar{
-    padding: 13px 22px;
-    font-size: 14px;
-    cursor: pointer;
-    background: var(--azul-inst);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    transition: background 0.15s ease;
-  }
-  .btn-buscar:hover{ background: var(--azul-inst-dark); }
-  .btn-buscar:disabled{ background: #B7B5AC; cursor: not-allowed; }
-
-  #estadoDiccionario {
-    max-width: 1040px;
-    margin: 10px auto 0;
-    font-size: 12.5px;
-    color: var(--texto-suave);
-    font-weight: 600;
-  }
-  .estado-ok { color: var(--verde); }
-  .error { color: var(--rojo); }
-
-  #estadoText{
-    max-width: 1040px;
-    margin: 14px auto 0;
-    font-size: 13.5px;
-    color: var(--texto-suave);
-  }
-  #estadoText.error{ color: var(--rojo); font-weight: 600; }
 
   #resumenResultados{
     max-width: 1040px;
@@ -605,53 +424,11 @@
     margin-top: 4px;
   }
 
-  .btn-copiar, .btn-link{
-    border: 1px solid #C7C4B8;
-    padding: 6px 10px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 11.5px;
-    white-space: nowrap;
-    font-family: inherit;
-    text-decoration: none;
-  }
-  .btn-copiar{ background: #FAF9F6; color: var(--texto); }
-  .btn-copiar:hover{ background: var(--linea); }
-  .btn-link{ background: var(--oro-suave); color: #7A5A18; border-color: #DFC98A; font-weight: 600; }
-  .btn-link:hover{ background: #EEDDAE; }
-
-  .skeleton{
-    height: 110px;
-    border-radius: 10px;
-    background: linear-gradient(90deg, #EDEBE4 25%, #F5F4F0 37%, #EDEBE4 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-  @keyframes shimmer{
-    0%{ background-position: 100% 50%; }
-    100%{ background-position: 0 50%; }
-  }
-
-  #toast{
-    visibility: hidden;
-    min-width: 260px;
-    background: var(--azul-inst-dark);
-    color: #fff;
-    text-align: center;
-    border-radius: 6px;
-    padding: 13px 16px;
-    position: fixed;
-    z-index: 10;
-    left: 50%;
-    bottom: 30px;
-    transform: translateX(-50%);
-    font-size: 13.5px;
-  }
-  #toast.show{ visibility: visible; animation: fadein 0.3s, fadeout 0.3s 1.7s; }
-  @keyframes fadein{ from{bottom:0; opacity:0;} to{bottom:30px; opacity:1;} }
-  @keyframes fadeout{ from{bottom:30px; opacity:1;} to{bottom:0; opacity:0;} }
-
+  /* ==========================================
+     7. ADAPTABILIDAD A PANTALLAS PEQUEÑAS (MÓVILES)
+     ========================================== */
   @media (max-width: 760px){
+    .dashboard{ grid-template-columns: 1fr; }
     .resultados-grid{ grid-template-columns: 1fr; }
     .buscador{ flex-direction: column; }
   }
