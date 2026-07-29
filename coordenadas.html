@@ -375,22 +375,40 @@
 
   // ==========================================
   // PASO 0: DESCARGAR MUNICIPIOS Y DISTRITOS
+  // ==========================================// ==========================================
+  // PASO 0: DESCARGAR MUNICIPIOS Y DISTRITOS (CON CACHÉ DE 24 HORAS)
   // ==========================================
   window.onload = async function () {
-    // Consulta 1: Todos los Municipios
+    const CACHE_ZONAS_KEY = "diccionario_zonas_mined";
+    const CACHE_ZONAS_TIME = "diccionario_zonas_time";
+    const HORAS_CACHE = 24;
+    const limiteTiempo = HORAS_CACHE * 60 * 60 * 1000;
+    const tiempoActual = Date.now();
+
+    // 1. Revisar caché local
+    const cacheGuardada = localStorage.getItem(CACHE_ZONAS_KEY);
+    const tiempoGuardado = localStorage.getItem(CACHE_ZONAS_TIME);
+
+    if (cacheGuardada && tiempoGuardado && (tiempoActual - tiempoGuardado < limiteTiempo)) {
+        diccionarioLugares = JSON.parse(cacheGuardada);
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">⚡ Zonas cargadas desde caché local. Escribe una zona para empezar.</span>`;
+        document.getElementById("lugarInput").disabled = false;
+        document.getElementById("btnBuscar").disabled = false;
+        document.getElementById("lugarInput").focus();
+        return;
+    }
+
+    // 2. Si no hay caché, descargar de Power BI
+    document.getElementById("estadoDiccionario").innerHTML = `⏳ Descargando listado de lugares actualizado desde el MINED...`;
     const bodyMunicipios = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"},"Name":"CE_2024.Municipio"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"17095abaaae058a6f737"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
-    
-    // Consulta 2: Todos los Distritos (Usando el visualId correcto de tu index)
     const bodyDistritos = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"},"Name":"CE_2024.Distrito"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${DATASET_ID}","Sources":[{"ReportId":"${REPORT_ID}","VisualId":"b917b9f95449267164bb"}]}}],"cancelQueries":[],"modelId":${MODEL_ID}}`;
 
     try {
-      // Lanzamos ambas peticiones al mismo tiempo para no hacer esperar al usuario
       const [respMuni, respDist] = await Promise.all([
         hacerPeticion(bodyMunicipios),
         hacerPeticion(bodyDistritos)
       ]);
 
-      // Función auxiliar para extraer los nombres de las respuestas de PowerBI
       function extraerNombres(respuesta) {
         let nombres = decodificarFilas(respuesta, 1)
           .map(f => (f && f[0] !== undefined && f[0] !== null) ? String(f[0]) : null)
@@ -411,20 +429,23 @@
       const listaMunicipios = extraerNombres(respMuni).map(n => ({ nombre: n, tipo: "Municipio" }));
       const listaDistritos = extraerNombres(respDist).map(n => ({ nombre: n, tipo: "Distrito" }));
 
-      // Unimos ambas listas en un solo mega-diccionario
       diccionarioLugares = [...listaMunicipios, ...listaDistritos];
 
       if (diccionarioLugares.length > 0) {
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ Cargados ${listaMunicipios.length} municipios y ${listaDistritos.length} distritos. Escribe una zona para empezar.</span>`;
+        // GUARDAR EN CACHÉ
+        localStorage.setItem(CACHE_ZONAS_KEY, JSON.stringify(diccionarioLugares));
+        localStorage.setItem(CACHE_ZONAS_TIME, tiempoActual.toString());
+
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ Zonas descargadas y guardadas. Escribe una zona para empezar.</span>`;
         document.getElementById("lugarInput").disabled = false;
         document.getElementById("btnBuscar").disabled = false;
         document.getElementById("lugarInput").focus();
       } else {
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ No se pudo leer la lista de zonas. Revisa la conexión o la consola (F12).</span>`;
+        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ No se pudo leer la lista de zonas. Revisa la conexión.</span>`;
       }
     } catch (error) {
       console.error("Error al descargar zonas:", error);
-      document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar la lista de zonas. Revisa la consola (F12).</span>`;
+      document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar la lista de zonas.</span>`;
     }
   };
 
