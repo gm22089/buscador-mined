@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Centros Escolares — MINED</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  
+  <!-- CSS del Mapa (Leaflet) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Tu CSS unificado -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="top">
+    <div class="marca">
+      <span class="eyebrow">Ministerio de Educación</span>
+    </div>
+    <h1>Mapa de Centros Escolares</h1>
+    <p class="sub">Visualiza las escuelas por municipio o distrito geográficamente.</p>
+    
+    <!-- 📍 Navegación -->
+    <div class="subnav">
+      <a href="index.html">🔎 Buscar por código o nombre</a>
+      <a href="coordenadas.html">📍 Buscar por zona (Muni/Dist)</a>
+      <a href="mapa.html" class="activa">Mapa Interactivo</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Buscador Superior -->
+    <div class="buscador">
+      <div class="campo-busqueda">
+        <input type="text" id="lugarInput" placeholder="Escribe un Municipio o Distrito (Ej. Santa Ana)" disabled autocomplete="off">
+        <div id="sugerenciasCaja" class="sugerencias"></div>
+      </div>
+      <button class="btn-buscar" id="btnBuscar" disabled>Mapear Zona</button>
+    </div>
+    
+    <div id="estadoDiccionario">Cargando mapa...</div>
+
+    <!-- 📍 CONTENEDOR PRINCIPAL EN 2 COLUMNAS (LISTA + MAPA) -->
+    <div class="layout-mapa">
+      
+      <!-- COLUMNA IZQUIERDA: Listado de Centros -->
+      <div id="contenedorListaMapeados" class="panel panel-lista" style="display: none;">
+        <h3>Centros Ubicados (<span id="totalMapeados">0</span>)</h3>
+        <p class="desc">Haz clic en un centro para enfocarlo en el mapa:</p>
+        <div id="listaCentrosMapeados" class="lista-centros-vertical"></div>
+      </div>
+
+      <!-- COLUMNA DERECHA: Mapa Interactivo -->
+      <div class="panel panel-mapa">
+        <div id="mapa-mined"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Script del Mapa (Leaflet) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Tu script para el mapa -->
+  <script src="js/mapa.js"></script>
+</body>
+</html>

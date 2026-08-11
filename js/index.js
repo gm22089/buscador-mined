@@ -37,6 +37,9 @@
   // ==========================================
   // PASO 0: DESCARGAR DICCIONARIO AL INICIAR (CON CACHÉ DE 24 HORAS)
   // ==========================================
+  // ==========================================
+  // PASO 0: DESCARGAR DICCIONARIO AL INICIAR (CON CACHÉ DE 24 HORAS)
+  // ==========================================
   window.onload = async function() {
       const CACHE_KEY = "diccionario_ce_mined";
       const CACHE_TIME_KEY = "diccionario_ce_mined_time";
@@ -54,6 +57,9 @@
           document.getElementById("ceInput").disabled = false;
           document.getElementById("btnBuscar").disabled = false;
           document.getElementById("ceInput").focus();
+          
+          // Verificar si venimos redirigidos desde el mapa
+          verificarBusquedaAutomatica();
           return; // Salimos de la función, no hacemos la petición a Power BI
       }
 
@@ -80,6 +86,9 @@
               document.getElementById("ceInput").disabled = false;
               document.getElementById("btnBuscar").disabled = false;
               document.getElementById("ceInput").focus();
+
+              // Verificar si venimos redirigidos desde el mapa
+              verificarBusquedaAutomatica();
           } else {
               document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ El servidor no devolvió la lista. Puede que la sesión haya caducado.</span>`;
           }
@@ -87,6 +96,27 @@
           document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar el diccionario.</span>`;
       }
   };
+
+  // ==========================================
+  // CONEXIÓN ENTRE PÁGINAS (MAPA -> MAESTRO)
+  // ==========================================
+  function verificarBusquedaAutomatica() {
+    // 1. Leemos los parámetros que vienen en la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    let codigoBuscado = urlParams.get('ce') || urlParams.get('codigo');
+
+    // 2. Respaldos: si no venía en la URL, revisamos la memoria temporal
+    if (!codigoBuscado) {
+      codigoBuscado = sessionStorage.getItem("buscarCodigoAutomatico");
+      sessionStorage.removeItem("buscarCodigoAutomatico");
+    }
+
+    // 3. Si encontramos un código, llenamos el input y ejecutamos la búsqueda
+    if (codigoBuscado) {
+      document.getElementById("ceInput").value = codigoBuscado;
+      ejecutarBusquedaMaestra();
+    }
+  }
 
   async function ejecutarBusquedaMaestra() {
     const codigoCorto = document.getElementById("ceInput").value.trim();
@@ -189,9 +219,20 @@
 
     if (esEnlace && !sinDato && valor.includes("http")) {
       const urlSegura = valor.replace(/"/g, "&quot;");
+      
+      // Extraemos las coordenadas del enlace
+      const coords = extraerCoordenadas(valor);
+      let botonCoordsHTML = "";
+
+      // Si se lograron extraer coordenadas, generamos el nuevo botón
+      if (coords) {
+        botonCoordsHTML = `<button class="btn-copiar btn-coords" onclick="copiarAlPortapapeles('${coords}')">📍 Copiar Coordenadas</button>`;
+      }
+
       botonesHTML = `
         <a href="${urlSegura}" target="_blank" rel="noopener" class="btn-link">Abrir ruta</a>
-        <button class="btn-copiar" onclick="copiarAlPortapapeles('${valorSeguro}')">Copiar link</button>`;
+        <button class="btn-copiar" onclick="copiarAlPortapapeles('${valorSeguro}')">Copiar link</button>
+        ${botonCoordsHTML}`;
     }
 
     const claseValor = sinDato ? "valor no-disp" : "valor";
@@ -420,3 +461,17 @@
       cajaSugerencias.classList.remove("show");
     }
   });
+
+  // Extrae 'latitud, longitud' directamente desde la URL de Google Maps o Waze
+  function extraerCoordenadas(url) {
+    if (!url || typeof url !== "string") return null;
+    const regexWaze = /ll=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const regexMaps = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const regexMapsQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    
+    const match = url.match(regexWaze) || url.match(regexMaps) || url.match(regexMapsQ);
+    if (match) {
+      return `${match[1]}, ${match[2]}`; // Retorna formato: "13.7941, -88.8965"
+    }
+    return null;
+  }
