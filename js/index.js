@@ -203,9 +203,10 @@ function extraerValorMatricula(data) {
 }
 
 // Renderiza cada fila de datos en un formato compacto y copiable al toque
+// Renderiza cada fila de datos compacta y con mensaje personalizado al copiar
 function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
   const sinDato = (valor === "Dato no disponible" || valor === "Matrícula no encontrada");
-  const valorSeguro = String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const valorSeguro = String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, " ");
   
   let contenidoDerecho = "";
 
@@ -216,7 +217,9 @@ function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
     const nombreApp = esWaze ? "Waze" : "Maps";
     const claseEstilo = esWaze ? "btn-app-waze" : "btn-app-maps";
 
-    let botonCoords = coords ? `<button class="btn-mini-coords" onclick="event.stopPropagation(); copiarAlPortapapeles('${coords}')" title="Copiar Coordenadas">📍 Coords</button>` : "";
+    let botonCoords = coords 
+      ? `<button class="btn-mini-coords" onclick="event.stopPropagation(); copiarAlPortapapeles('${coords}', 'Coordenadas')" title="Copiar Coordenadas">📍 Coords</button>` 
+      : "";
 
     contenidoDerecho = `
       <div class="acciones-compactas">
@@ -228,7 +231,8 @@ function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
   }
 
   const claseValor = sinDato ? "valor no-disp" : "valor";
-  const atributoClick = sinDato ? "" : `onclick="copiarAlPortapapeles('${valorSeguro}')" title="Toca para copiar"`;
+  // Le pasamos el valor exacto a la función copiarAlPortapapeles
+  const atributoClick = sinDato ? "" : `onclick="copiarAlPortapapeles('${valorSeguro}', '${titulo}')" title="Toca para copiar"`;
 
   contenedor.innerHTML += `
     <div class="fila-dato-compacta ${sinDato ? '' : 'copiable'}" ${atributoClick}>
