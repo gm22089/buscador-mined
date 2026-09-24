@@ -77,6 +77,7 @@ export class MapaUI {
         puntosEncontrados++;
         const infoBD = dbManager.getEstado(codigo);
         const colorEstado = infoBD.estado;
+        const esVisitado = colorEstado === "visitado";
         
         let textoEstado = "Sin Visitar";
         if (colorEstado === "visitado") textoEstado = `Visitado el ${infoBD.fecha}`;
@@ -87,13 +88,22 @@ export class MapaUI {
           icon: this.crearIcono(false, colorEstado)
         });
 
+        // Popup interactivo adaptado para celulares
         const popupContenido = `
           <div class="popup-mined" style="min-width: 220px;">
             <h4 style="margin: 0 0 5px 0; color: #14375E;">INFRA: ${this.escaparHTML(String(codigo))}</h4>
             <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px;">${this.escaparHTML(nombre || "Sin nombre")}</p>
             <p style="margin: 0 0 5px 0; font-size: 11px; color: #666;"><strong>Distrito:</strong> ${this.escaparHTML(distrito || "")}</p>
             
-            <div style="background: #e2e8f0; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
+            <!-- Botón de 1-Clic para celular -->
+            <button id="btn-popup-visita-${codigo}" 
+                    class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" 
+                    onclick="window.toggleVisitaRapida('${codigo}')" 
+                    style="width: 100%; margin: 8px 0; padding: 7px;">
+              ${esVisitado ? '✓ Visitado' : 'Marcar Visitado'}
+            </button>
+
+            <div style="background: #e2e8f0; padding: 8px; border-radius: 6px; margin-bottom: 10px;">
               <p style="margin: 0 0 5px 0; font-size: 11px; color: #333;"><strong>Estado:</strong> <span id="label_estado_${codigo}">${textoEstado}</span></p>
               <select id="select_estado_${codigo}" style="width: 100%; padding: 4px; font-size: 11px; margin-bottom:5px;">
                  <option value="normal" ${colorEstado === 'normal' ? 'selected' : ''}>Sin Visitar</option>
@@ -103,7 +113,7 @@ export class MapaUI {
               </select>
               <button onclick="window.guardarEstadoBD('${codigo}')" style="width: 100%; font-size: 11px; cursor: pointer;">Guardar Cambio</button>
             </div>
-            <button onclick="window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')" style="display:block; width: 100%; padding: 6px; background: #B8892B; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Ver Expediente</button>
+            <button onclick="window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')" style="display:block; width: 100%; padding: 6px; background: #B8892B; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Ver Expediente ↗</button>
           </div>
         `;
         
@@ -113,15 +123,27 @@ export class MapaUI {
 
         this.diccionarioMarcadores[codigo] = { marcador, datos: { codigo, nombre, distrito } };
 
+        // Tarjeta en lista lateral
         htmlItems += `
-          <div class="item-centro-card" id="card-ce-${codigo}" onclick="window.seleccionarCentro('${codigo}', true)">
+          <div class="item-centro-card ${esVisitado ? 'visitado' : ''}" id="card-ce-${codigo}" onclick="window.seleccionarCentro('${codigo}', true)">
             <div class="card-head">
-              <span class="badge-infra">${this.escaparHTML(String(codigo))}</span>
-              <button class="btn-ver-expediente" onclick="event.stopPropagation(); window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')">Expediente ↗</button>
+              <span class="badge-infra">Cod: ${this.escaparHTML(String(codigo))}</span>
+              <span class="badge-estado-texto ${colorEstado}" id="badge-estado-${codigo}">
+                ${colorEstado === 'visitado' ? '✓ Visitado' : colorEstado === 'intervenido' ? '🟠 Intervenido' : colorEstado === 'cerrado' ? '🔴 Cerrado' : '⏳ Pendiente'}
+              </span>
             </div>
             <div class="card-body">
               <strong>${this.escaparHTML(nombre || "Sin nombre")}</strong>
-              <small>${this.escaparHTML(distrito || "")}</small>
+              <small>📍 ${this.escaparHTML(distrito || "")}</small>
+            </div>
+            <div class="card-actions">
+              <button class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" id="btn-visita-${codigo}" 
+                      onclick="event.stopPropagation(); window.toggleVisitaRapida('${codigo}')">
+                ${esVisitado ? '✓ Visitado' : 'Marcar Visita'}
+              </button>
+              <button class="btn-ver-expediente" onclick="event.stopPropagation(); window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')">
+                Expediente ↗
+              </button>
             </div>
           </div>
         `;

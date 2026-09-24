@@ -118,15 +118,75 @@ window.guardarEstadoBD = async (codigo) => {
   const nuevoEstado = selectElem.value;
   try {
     const info = await db.guardarEstado(codigo, nuevoEstado);
-    alert("¡Estado guardado correctamente!");
     
     const labelElem = document.getElementById(`label_estado_${codigo}`);
     if (labelElem) labelElem.innerText = `${info.estado} el ${info.fecha}`;
     
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) marcadorInfo.marcador.setIcon(mapa.crearIcono(true, info.estado));
+
+    // Sincronizar botón rápido en tarjeta y popup si existe
+    window.actualizarUIEstado(codigo, info.estado);
   } catch (error) {
     alert(error.message);
+  }
+};
+
+// Alternar visita directa en 1 Clic (Móvil y Escritorio)
+window.toggleVisitaRapida = async (codigo) => {
+  const estadoActual = db.getEstado(codigo).estado;
+  const nuevoEstado = (estadoActual === "visitado") ? "normal" : "visitado";
+
+  try {
+    const info = await db.guardarEstado(codigo, nuevoEstado);
+
+    // 1. Actualizar icono del pin en el mapa
+    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
+    if (marcadorInfo) {
+      marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
+    }
+
+    // 2. Sincronizar elementos UI (Popups y Tarjetas)
+    window.actualizarUIEstado(codigo, info.estado, info.fecha);
+
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+// Función auxiliar para actualizar los elementos DOM en paralelo
+window.actualizarUIEstado = (codigo, estado, fecha = "") => {
+  const esVisitado = estado === "visitado";
+
+  // Actualizar Tarjeta Lateral
+  const card = document.getElementById(`card-ce-${codigo}`);
+  const btnCard = document.getElementById(`btn-visita-${codigo}`);
+  const badgeCard = document.getElementById(`badge-estado-${codigo}`);
+
+  if (card) card.classList.toggle("visitado", esVisitado);
+  if (btnCard) {
+    btnCard.classList.toggle("activo", esVisitado);
+    btnCard.innerText = esVisitado ? "✓ Visitado" : "Marcar Visita";
+  }
+  if (badgeCard) {
+    badgeCard.className = `badge-estado-texto ${estado}`;
+    badgeCard.innerText = esVisitado ? "✓ Visitado" : estado === "intervenido" ? "🟠 Intervenido" : estado === "cerrado" ? "🔴 Cerrado" : "⏳ Pendiente";
+  }
+
+  // Actualizar Popup dentro del Mapa (Celular)
+  const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
+  const labelPopup = document.getElementById(`label_estado_${codigo}`);
+  const selectPopup = document.getElementById(`select_estado_${codigo}`);
+
+  if (btnPopup) {
+    btnPopup.classList.toggle("activo", esVisitado);
+    btnPopup.innerText = esVisitado ? "✓ Visitado" : "Marcar Visitado";
+  }
+  if (labelPopup) {
+    labelPopup.innerText = esVisitado ? `Visitado el ${fecha}` : "Sin Visitar";
+  }
+  if (selectPopup) {
+    selectPopup.value = estado;
   }
 };
 

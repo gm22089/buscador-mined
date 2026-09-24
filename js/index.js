@@ -202,7 +202,8 @@ function extraerValorMatricula(data) {
   } catch (e) { return "Dato no disponible"; }
 }
 
-// --- INTERFAZ ---
+// Renderiza cada fila de datos en la interfaz
+// Renderiza cada fila de datos en la interfaz con botones visuales
 function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
   const sinDato = (valor === "Dato no disponible" || valor === "Matrícula no encontrada");
   const valorSeguro = String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -214,11 +215,23 @@ function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
     let botonCoordsHTML = "";
 
     if (coords) {
-      botonCoordsHTML = `<button class="btn-copiar btn-coords" onclick="copiarAlPortapapeles('${coords}')">📍 Copiar Coordenadas</button>`;
+      botonCoordsHTML = `<button class="btn-copiar btn-coords" onclick="copiarAlPortapapeles('${coords}')">📍 Coordenadas</button>`;
     }
 
+    // Definición de Íconos SVG
+    const iconoMaps = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+    const iconoWaze = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.5 10c0-4.14-3.36-7.5-7.5-7.5S3.5 5.86 3.5 10c0 1.62.51 3.12 1.39 4.35l-1.04 3.12 3.25-.82C8.28 17.41 9.84 17.8 11 17.8c4.14 0 7.5-3.36 7.5-7.8zM8.5 9c.83 0 1.5.67 1.5 1.5S9.33 12 8.5 12 7 11.33 7 10.5 7.67 9 8.5 9zm5 0c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5-1.5-.67-1.5-1.5.67-1.5 1.5-1.5z"/></svg>`;
+
+    // Determinar estilo según el servicio de mapas
+    const esWaze = titulo.toLowerCase().includes("waze");
+    const nombreApp = esWaze ? "Waze" : "Google Maps";
+    const iconoApp = esWaze ? iconoWaze : iconoMaps;
+    const claseEstilo = esWaze ? "btn-app-waze" : "btn-app-maps";
+
     botonesHTML = `
-      <a href="${urlSegura}" target="_blank" rel="noopener" class="btn-link">Abrir ruta</a>
+      <a href="${urlSegura}" target="_blank" rel="noopener" class="btn-link-app ${claseEstilo}" title="Abrir en ${nombreApp}">
+        ${iconoApp} <span>${nombreApp}</span>
+      </a>
       <button class="btn-copiar" onclick="copiarAlPortapapeles('${valorSeguro}')">Copiar link</button>
       ${botonCoordsHTML}`;
   }
@@ -227,9 +240,18 @@ function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
 
   contenedor.innerHTML += `
     <div class="fila-dato">
-      <div class="texto-dato"><strong>${titulo}</strong><span class="${claseValor}">${escaparHTML(String(valor))}</span></div>
+      <div class="texto-dato">
+        <strong>${titulo}</strong>
+        <span class="${claseValor}">${esEnlace && !sinDato ? "Ubicación Geográfica" : escapingHTML(String(valor))}</span>
+      </div>
       <div class="acciones-btn">${botonesHTML}</div>
     </div>`;
+}
+
+function escapingHTML(str) {
+  const div = document.createElement("div");
+  div.innerText = str;
+  return div.innerHTML;
 }
 
 function escaparHTML(str) {
@@ -476,15 +498,17 @@ document.addEventListener("click", function (e) {
   }
 });
 
+// Extrae 'latitud, longitud' desde enlaces de Google Maps, Waze o enlaces genéricos de mapa
 function extraerCoordenadas(url) {
   if (!url || typeof url !== "string") return null;
   const regexWaze = /ll=(-?\d+\.\d+),(-?\d+\.\d+)/;
   const regexMaps = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
   const regexMapsQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+  const regexGeneric = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
   
-  const match = url.match(regexWaze) || url.match(regexMaps) || url.match(regexMapsQ);
+  const match = url.match(regexWaze) || url.match(regexMaps) || url.match(regexMapsQ) || url.match(regexGeneric);
   if (match) {
-    return `${match[1]}, ${match[2]}`;
+    return `${match[1]}, ${match[2]}`; // Formato: "13.7941, -88.8965"
   }
   return null;
 }
