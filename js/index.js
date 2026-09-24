@@ -320,13 +320,17 @@ function generarBodySuperFetch(nombreCE) {
 }
 
 // --- ACCIONES DE USUARIO ---
-function copiarAlPortapapeles(texto) {
+function copiarAlPortapapeles(texto, etiqueta = "") {
+  if (!texto || texto === "Dato no disponible") return;
+
+  const mensajeToast = etiqueta ? `Copiado (${etiqueta}): ${texto}` : `Copiado: ${texto}`;
+
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(texto)
-      .then(() => mostrarToast(`Copiado al portapapeles`))
-      .catch(() => fallbackCopiar(texto));
+      .then(() => mostrarToast(mensajeToast))
+      .catch(() => fallbackCopiar(texto, mensajeToast));
   } else {
-    fallbackCopiar(texto);
+    fallbackCopiar(texto, mensajeToast);
   }
 }
 
