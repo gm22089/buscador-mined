@@ -1,14 +1,11 @@
 ﻿<!DOCTYPE html>
 <html lang="es">
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Buscador Maestro de Centros Escolares — MINED</title>
-
-<link rel="icon" type="image/png" href="img/favicon.png">
-
-<link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buscador Maestro de Centros Escolares — MINED</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -20,11 +17,11 @@
   <p class="sub">Extrae en un clic la ficha completa de un Centro Educativo desde el panel público de Power BI.</p>
 
   <nav class="subnav">
-  <a href="index.html">🔎 Buscar por código o nombre</a>
-  <a href="coordenadas.html">📍 Buscar por zona (Muni/Dist)</a>
-  <a href="mapa.html">🗺️ Mapa Interactivo</a>
-  <a href="estadisticas.html">📊 Estadísticas</a>
-</nav>
+    <a href="index.html" class="activa">🔎 Buscar por código o nombre</a>
+    <a href="coordenadas.html">📍 Buscar por zona (Muni/Dist)</a>
+    <a href="mapa.html">🗺️ Mapa Interactivo</a>
+    <a href="estadisticas.html">📊 Estadísticas</a>
+  </nav>
 </header>
 
 <main>
@@ -43,15 +40,51 @@
     
     <div class="panel">
       <button class="btn-super-fetch" onclick="copiarFilaExcel()">
-  📋 Copiar Fila para Excel (C a G)
-</button>
+        📋 Copiar Fila para Excel (C a G)
+      </button>
       <h2>Datos detallados</h2>
       <p class="desc">Cada dato se consulta por separado directamente desde el dataset público.</p>
       <div id="listaDetalles"></div>
-      
     </div>
 
     <div class="panel" style="display:flex; flex-direction:column;">
+      
+      <!-- BLOQUE NUEVO: CONTROL DE VISITA Y ESTADO EN FIREBASE -->
+      <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+          <h3 style="margin: 0; font-size: 15px; color: #14375E;">📍 Estado de Visita</h3>
+          <span id="infoSesionIndex" style="font-size: 11px; color: #64748b;"></span>
+        </div>
+
+        <div id="badgeEstadoIndex" style="background: #e2e8f0; color: #1e293b; padding: 7px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 700; margin-bottom: 10px;">
+          ⏳ Sin Visitar
+        </div>
+
+        <button id="btnVisitaRapidaIndex" onclick="marcarVisitadoRapidoIndex()" style="width: 100%; padding: 8px; margin-bottom: 10px; background: #14375E; color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 13px; cursor: pointer;">
+          ✓ Marcar Visitado
+        </button>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+          <div>
+            <label for="fechaVisitaIndex" style="display: block; font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 3px;">Fecha:</label>
+            <input type="date" id="fechaVisitaIndex" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; box-sizing: border-box;">
+          </div>
+          <div>
+            <label for="estadoSelectIndex" style="display: block; font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 3px;">Estado:</label>
+            <select id="estadoSelectIndex" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12.5px; background: #fff;">
+              <option value="normal">Sin Visitar</option>
+              <option value="visitado">Visitado (Verde)</option>
+              <option value="intervenido">Intervenido (Naranja)</option>
+              <option value="cerrado">Cerrado (Rojo)</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="guardarEstadoIndex()" style="width: 100%; padding: 7px; background: #2563eb; color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 12.5px; cursor: pointer;">
+          Guardar Cambio
+        </button>
+      </div>
+
       <h2>Ficha resumen</h2>
       <p class="desc">Bloque consolidado listo para copiar y pegar.</p>
 
@@ -66,8 +99,11 @@
 
 <div id="toast"></div>
 
+<!-- Librerías de Firebase (Igual que en mapa.html) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-<script src="js/index.js"></script>
+<!-- Script principal como módulo ES6 -->
+<script type="module" src="js/index.js"></script>
 </body>
-
 </html>
