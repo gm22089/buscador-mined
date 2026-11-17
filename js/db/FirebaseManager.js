@@ -18,6 +18,15 @@ export class FirebaseManager {
     this.usuarioActual = localStorage.getItem("usuario_ce_mapa") || null;
   }
 
+  // Obtiene la fecha actual en formato YYYY-MM-DD según la hora local
+  obtenerFechaLocal() {
+    const hoy = new Date();
+    const anio = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    return `${anio}-${mes}-${dia}`;
+  }
+
   async cargarEstadosIniciales() {
     try {
       const snapshot = await this.db.collection("estados_escuelas").get();
@@ -32,10 +41,9 @@ export class FirebaseManager {
   }
 
   getEstado(codigo) {
-    return this.diccionarioEstados[codigo] || { estado: "normal", fecha: "N/A" };
+    return this.diccionarioEstados[codigo] || { estado: "normal", fecha: "N/A", usuario: "" };
   }
 
-  // Consulta la colección 'usuarios_autorizados' en Firebase Firestore
   async verificarUsuarioEnFirebase(usuarioID, pin) {
     const idLimpio = usuarioID.trim().toLowerCase();
     const docRef = await this.db.collection("usuarios_autorizados").doc(idLimpio).get();
@@ -52,7 +60,7 @@ export class FirebaseManager {
     return datosUsuario.nombreMostrar || usuarioID;
   }
 
-  async guardarEstado(codigo, nuevoEstado) {
+  async guardarEstado(codigo, nuevoEstado, fechaPersonalizada = null) {
     if (!this.usuarioActual) {
       const usuarioInput = prompt("Ingresa tu usuario:");
       if (!usuarioInput) throw new Error("Debes ingresar un usuario para guardar.");
@@ -60,22 +68,49 @@ export class FirebaseManager {
       const pinInput = prompt("Ingresa tu clave/PIN de acceso:");
       if (!pinInput) throw new Error("Debes ingresar tu clave.");
 
-      // Validar datos directamente con Firebase
       const nombreVerificado = await this.verificarUsuarioEnFirebase(usuarioInput, pinInput);
 
       this.usuarioActual = nombreVerificado;
       localStorage.setItem("usuario_ce_mapa", this.usuarioActual);
     }
 
-    const fechaActual = new Date().toISOString().split('T')[0];
+    // Usa la fecha seleccionada por el usuario o, por defecto, la fecha actual
+    const fechaRegistro = (fechaPersonalizada && fechaPersonalizada.trim() !== "")
+      ? fechaPersonalizada.trim()
+      : this.obtenerFechaLocal();
+
     const datos = { 
       estado: nuevoEstado, 
-      fecha: fechaActual, 
+      fecha: fechaRegistro, 
       usuario: this.usuarioActual 
     };
 
     await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
     this.diccionarioEstados[codigo] = datos;
     return datos;
+  }
+
+  async exportarRespaldoJSON() {
+    const colecciones = ["estados_escuelas", "usuarios_autorizados"];
+    const respaldo = {
+      fechaExportacion: new Date().toISOString(),
+      datos: {}
+    };
+
+    for (const nombreCol of colecciones) {
+      respaldo.datos[nombreCol] = {};
+      const snapshot = await this.db.collection(nombreCol).get();
+      snapshot.forEach(doc => {
+        respaldo.datos[nombreCol][doc.id] = doc.data();
+      });
+    }
+
+    const blob = new Blob([JSON.stringify(respaldo, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `respaldo_bd_mined_${this.obtenerFechaLocal()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 }

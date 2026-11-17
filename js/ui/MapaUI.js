@@ -1,192 +1,256 @@
-export class MapaUI {
-  constructor(idContenedor) {
-    this.diccionarioMarcadores = {};
-    this.codigoSeleccionadoActual = null;
+import { FirebaseManager } from './db/FirebaseManager.js';
+import { MinedAPI } from './api/MinedAPI.js';
+import { MapaUI } from './ui/MapaUI.js';
 
-    const mapaCalles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 });
-    const mapaSatelite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 });
+const db = new FirebaseManager();
+const api = new MinedAPI();
+let mapa;
 
-    this.mapa = L.map(idContenedor, {
-      center: [13.794185, -88.89653],
-      zoom: 8,
-      layers: [mapaCalles]
-    });
+// Elementos DOM
+const inputLugar = document.getElementById("lugarInput");
+const btnBuscar = document.getElementById("btnBuscar");
+const cajaSugerencias = document.getElementById("sugerenciasCaja");
+const estadoText = document.getElementById("estadoDiccionario");
 
-    L.control.layers({ "🗺️ Mapa Estándar": mapaCalles, "🛰️ Vista Satelital": mapaSatelite }).addTo(this.mapa);
-    this.capaPines = L.featureGroup().addTo(this.mapa);
-  }
+// Variables para autocompletado
+let sugerenciasActuales = [];
+let indiceActivo = -1;
 
-  crearIcono(esSeleccionado = false, estadoBD = "normal") {
-    let color = "#14375E"; 
-    if (!esSeleccionado) {
-      if (estadoBD === "visitado") color = "#28a745";
-      if (estadoBD === "intervenido") color = "#fd7e14";
-      if (estadoBD === "cerrado") color = "#dc3545";
-    } else {
-      color = "#B8892B"; 
-    }
-
-    const tamano = esSeleccionado ? [36, 48] : [28, 38];
-    const ancla = esSeleccionado ? [18, 48] : [14, 38];
-
-    const svgIcono = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="${tamano[0]}" height="${tamano[1]}">
-        <path fill="${color}" stroke="#FFFFFF" stroke-width="1.5" d="M12 0C5.37 0 0 5.37 0 12c0 9 12 24 12 24s12-15 12-24c0-6.63-5.37-12-12-12zm0 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-      </svg>`;
-
-    return L.divIcon({
-      className: esSeleccionado ? 'pin-custom pin-activo' : 'pin-custom',
-      html: svgIcono,
-      iconSize: tamano,
-      iconAnchor: ancla,
-      popupAnchor: [0, -ancla[1] + 5]
-    });
-  }
-
-  limpiarMapaYLista() {
-    this.capaPines.clearLayers();
-    this.diccionarioMarcadores = {};
-    this.codigoSeleccionadoActual = null;
-    document.getElementById("listaCentrosMapeados").innerHTML = "";
-    document.getElementById("contenedorListaMapeados").style.display = "none";
-  }
-
-  extraerCoordenadas(url) {
-    if (!url || typeof url !== "string") return null;
-    const match = url.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if (match) return { lat: match[1], lng: match[2] };
-    return null;
-  }
-
-  escaparHTML(str) {
-    const div = document.createElement("div");
-    div.innerText = str;
-    return div.innerHTML;
-  }
-
-  dibujarPines(filas, dbManager) {
-    this.limpiarMapaYLista();
-    let puntosEncontrados = 0;
-    let htmlItems = "";
-
-    filas.forEach(fila => {
-      const [codigo, nombre, distrito, direccion, googleLink, wazeLink] = fila;
-      const coords = this.extraerCoordenadas(wazeLink || googleLink);
-
-      if (coords && codigo) {
-        puntosEncontrados++;
-        const infoBD = dbManager.getEstado(codigo);
-        const colorEstado = infoBD.estado;
-        const esVisitado = colorEstado === "visitado";
-        
-        let textoEstado = "Sin Visitar";
-        if (colorEstado === "visitado") textoEstado = `Visitado el ${infoBD.fecha}`;
-        if (colorEstado === "intervenido") textoEstado = `Intervenido el ${infoBD.fecha}`;
-        if (colorEstado === "cerrado") textoEstado = `Cerrado el ${infoBD.fecha}`;
-
-        const marcador = L.marker([parseFloat(coords.lat), parseFloat(coords.lng)], {
-          icon: this.crearIcono(false, colorEstado)
-        });
-
-        // Popup interactivo adaptado para celulares
-        const popupContenido = `
-          <div class="popup-mined" style="min-width: 220px;">
-            <h4 style="margin: 0 0 5px 0; color: #14375E;">INFRA: ${this.escaparHTML(String(codigo))}</h4>
-            <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px;">${this.escaparHTML(nombre || "Sin nombre")}</p>
-            <p style="margin: 0 0 5px 0; font-size: 11px; color: #666;"><strong>Distrito:</strong> ${this.escaparHTML(distrito || "")}</p>
-            
-            <!-- Botón de 1-Clic para celular -->
-            <button id="btn-popup-visita-${codigo}" 
-                    class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" 
-                    onclick="window.toggleVisitaRapida('${codigo}')" 
-                    style="width: 100%; margin: 8px 0; padding: 7px;">
-              ${esVisitado ? '✓ Visitado' : 'Marcar Visitado'}
-            </button>
-
-            <div style="background: #e2e8f0; padding: 8px; border-radius: 6px; margin-bottom: 10px;">
-              <p style="margin: 0 0 5px 0; font-size: 11px; color: #333;"><strong>Estado:</strong> <span id="label_estado_${codigo}">${textoEstado}</span></p>
-              <select id="select_estado_${codigo}" style="width: 100%; padding: 4px; font-size: 11px; margin-bottom:5px;">
-                 <option value="normal" ${colorEstado === 'normal' ? 'selected' : ''}>Sin Visitar</option>
-                 <option value="visitado" ${colorEstado === 'visitado' ? 'selected' : ''}>Visitado (Verde)</option>
-                 <option value="intervenido" ${colorEstado === 'intervenido' ? 'selected' : ''}>Intervenido (Naranja)</option>
-                 <option value="cerrado" ${colorEstado === 'cerrado' ? 'selected' : ''}>Cerrado (Rojo)</option>
-              </select>
-              <button onclick="window.guardarEstadoBD('${codigo}')" style="width: 100%; font-size: 11px; cursor: pointer;">Guardar Cambio</button>
-            </div>
-            <button onclick="window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')" style="display:block; width: 100%; padding: 6px; background: #B8892B; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Ver Expediente ↗</button>
-          </div>
-        `;
-        
-        marcador.bindPopup(popupContenido);
-        marcador.on('click', () => window.seleccionarCentro(codigo, false));
-        this.capaPines.addLayer(marcador);
-
-        this.diccionarioMarcadores[codigo] = { marcador, datos: { codigo, nombre, distrito } };
-
-        // Tarjeta en lista lateral
-        htmlItems += `
-          <div class="item-centro-card ${esVisitado ? 'visitado' : ''}" id="card-ce-${codigo}" onclick="window.seleccionarCentro('${codigo}', true)">
-            <div class="card-head">
-              <span class="badge-infra">Cod: ${this.escaparHTML(String(codigo))}</span>
-              <span class="badge-estado-texto ${colorEstado}" id="badge-estado-${codigo}">
-                ${colorEstado === 'visitado' ? '✓ Visitado' : colorEstado === 'intervenido' ? '🟠 Intervenido' : colorEstado === 'cerrado' ? '🔴 Cerrado' : '⏳ Pendiente'}
-              </span>
-            </div>
-            <div class="card-body">
-              <strong>${this.escaparHTML(nombre || "Sin nombre")}</strong>
-              <small>📍 ${this.escaparHTML(distrito || "")}</small>
-            </div>
-            <div class="card-actions">
-              <button class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" id="btn-visita-${codigo}" 
-                      onclick="event.stopPropagation(); window.toggleVisitaRapida('${codigo}')">
-                ${esVisitado ? '✓ Visitado' : 'Marcar Visita'}
-              </button>
-              <button class="btn-ver-expediente" onclick="event.stopPropagation(); window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')">
-                Expediente ↗
-              </button>
-            </div>
-          </div>
-        `;
-      }
-    });
-
-    if (puntosEncontrados > 0) {
-      document.getElementById("listaCentrosMapeados").innerHTML = htmlItems;
-      document.getElementById("totalMapeados").innerText = puntosEncontrados;
-      document.getElementById("contenedorListaMapeados").style.display = "block";
-      this.mapa.fitBounds(this.capaPines.getBounds(), { padding: [30, 30] });
-    }
-    return puntosEncontrados;
-  }
-
-  seleccionar(codigo, dbManager, moverCamara = true) {
-    if (!this.diccionarioMarcadores[codigo]) return;
-
-    if (this.codigoSeleccionadoActual && this.diccionarioMarcadores[this.codigoSeleccionadoActual]) {
-      const prevObj = this.diccionarioMarcadores[this.codigoSeleccionadoActual];
-      const estadoPrevio = dbManager.getEstado(this.codigoSeleccionadoActual).estado;
-      prevObj.marcador.setIcon(this.crearIcono(false, estadoPrevio));
-      prevObj.marcador.setZIndexOffset(0);
-      const prevCard = document.getElementById(`card-ce-${this.codigoSeleccionadoActual}`);
-      if (prevCard) prevCard.classList.remove("activa");
-    }
-
-    this.codigoSeleccionadoActual = codigo;
-    const itemActual = this.diccionarioMarcadores[codigo];
-    const estadoActual = dbManager.getEstado(codigo).estado;
+// ==========================================
+// 1. INICIALIZACIÓN ROBUSTA
+// ==========================================
+async function iniciarApp() {
+  try {
+    mapa = new MapaUI('mapa-mined');
     
-    itemActual.marcador.setIcon(this.crearIcono(true, estadoActual));
-    itemActual.marcador.setZIndexOffset(1000);
+    estadoText.innerHTML = `⏳ Descargando listado de lugares actualizados...`;
 
-    const cardActual = document.getElementById(`card-ce-${codigo}`);
-    if (cardActual) {
-      cardActual.classList.add("activa");
-      cardActual.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    await Promise.all([
+      db.cargarEstadosIniciales().catch(err => {
+        console.warn("Advertencia Firebase:", err);
+        return {};
+      }),
+      api.descargarZonas().catch(err => {
+        console.error("Error Power BI:", err);
+        throw new Error("No se pudo descargar el listado de municipios.");
+      })
+    ]);
 
-    if (moverCamara) {
-      this.mapa.setView(itemActual.marcador.getLatLng(), 16, { animate: true });
-      itemActual.marcador.openPopup();
-    }
+    estadoText.innerHTML = `<span class="estado-ok">✅ Zonas listas. Escribe un municipio o distrito.</span>`;
+    
+    inputLugar.disabled = false;
+    btnBuscar.disabled = false;
+    inputLugar.focus();
+
+    btnBuscar.addEventListener("click", buscarLugarYRenderizar);
+    inputLugar.addEventListener("input", actualizarSugerencias);
+    inputLugar.addEventListener("keydown", manejarTecladoSugerencias);
+
+  } catch (error) {
+    console.error("Error en iniciarApp:", error);
+    estadoText.innerHTML = `<span class="error">❌ ${error.message}</span>`;
   }
 }
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", iniciarApp);
+} else {
+  iniciarApp();
+}
+
+// ==========================================
+// 2. LÓGICA PRINCIPAL: BUSCAR Y RENDERIZAR
+// ==========================================
+async function buscarLugarYRenderizar() {
+  const query = api.normalizarTexto(inputLugar.value.trim());
+  if (!query) return estadoText.innerHTML = `<span class="error">Escribe un lugar antes de buscar.</span>`;
+
+  const lugar = api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre) === query) || 
+                api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre).includes(query));
+
+  if (!lugar) {
+    estadoText.innerHTML = `<span class="error">❌ Lugar no encontrado. Escribe el nombre completo o selecciónalo de la lista.</span>`;
+    return mapa.limpiarMapaYLista();
+  }
+
+  inputLugar.value = lugar.nombre;
+  cajaSugerencias.classList.remove("show");
+  estadoText.innerHTML = `Buscando centros y coordenadas en: <strong>${lugar.nombre}</strong>...`;
+  btnBuscar.disabled = true;
+
+  try {
+    const filas = await api.buscarCentros(lugar);
+    const total = mapa.dibujarPines(filas, db);
+    
+    if (total > 0) {
+      estadoText.innerHTML = `<span class="estado-ok">✅ Se ubicaron ${total} centros en ${lugar.nombre}.</span>`;
+    } else {
+      estadoText.innerHTML = `<span class="error">Se encontraron escuelas en ${lugar.nombre}, pero no tienen coordenadas válidas para mostrar en el mapa.</span>`;
+    }
+  } catch (error) {
+    console.error("Error al buscar centros:", error);
+    estadoText.innerHTML = `<span class="error">❌ Error al consultar la base de datos de Power BI: ${error.message}</span>`;
+  } finally {
+    btnBuscar.disabled = false;
+  }
+}
+
+// ==========================================
+// 3. FUNCIONES GLOBALES (Expuestas a la ventana)
+// ==========================================
+window.seleccionarCentro = (codigo, moverCamara) => {
+  mapa.seleccionar(codigo, db, moverCamara);
+};
+
+window.llevarAlBuscador = (codigo) => {
+  if (!codigo || codigo === "N/A") return;
+  window.open(`index.html?ce=${encodeURIComponent(codigo)}`, '_blank');
+};
+
+window.guardarEstadoBD = async (codigo) => {
+  const selectElem = document.getElementById(`select_estado_${codigo}`);
+  const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
+  if (!selectElem) return;
+  
+  const nuevoEstado = selectElem.value;
+  const fechaSeleccionada = fechaElem ? fechaElem.value : null;
+
+  try {
+    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada);
+    
+    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
+    if (marcadorInfo) {
+      marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
+    }
+
+    window.actualizarUIEstado(codigo, info.estado, info.fecha, info.usuario);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+// Alternar visita directa en 1 Clic (respeta la fecha elegida en el popup si está abierto, o usa hoy)
+window.toggleVisitaRapida = async (codigo) => {
+  const estadoActual = db.getEstado(codigo).estado;
+  const nuevoEstado = (estadoActual === "visitado") ? "normal" : "visitado";
+  const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
+  const fechaSeleccionada = fechaElem ? fechaElem.value : null;
+
+  try {
+    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada);
+
+    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
+    if (marcadorInfo) {
+      marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
+    }
+
+    window.actualizarUIEstado(codigo, info.estado, info.fecha, info.usuario);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+// Sincroniza textos, fechas y nombres de visitante en Popup y Tarjeta Lateral
+window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
+  const esVisitado = estado === "visitado";
+  const textoDetalle = mapa.formatearDetalleEstado({ estado, fecha, usuario });
+
+  // 1. Actualizar Tarjeta Lateral
+  const card = document.getElementById(`card-ce-${codigo}`);
+  const btnCard = document.getElementById(`btn-visita-${codigo}`);
+  const badgeCard = document.getElementById(`badge-estado-${codigo}`);
+
+  if (card) card.classList.toggle("visitado", esVisitado);
+  if (btnCard) {
+    btnCard.classList.toggle("activo", esVisitado);
+    btnCard.style.background = esVisitado ? "#2e7d32" : "#e2e8f0";
+    btnCard.style.color = esVisitado ? "#fff" : "#1e293b";
+    btnCard.innerText = esVisitado ? "✓ Visitado" : "Marcar Visita";
+  }
+  if (badgeCard) {
+    badgeCard.className = `badge-estado-texto ${estado}`;
+    badgeCard.style.color = esVisitado ? "#2e7d32" : "#64748b";
+    badgeCard.innerText = textoDetalle;
+  }
+
+  // 2. Actualizar Popup dentro del Mapa
+  const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
+  const labelPopup = document.getElementById(`label_estado_${codigo}`);
+  const selectPopup = document.getElementById(`select_estado_${codigo}`);
+  const fechaPopup = document.getElementById(`fecha_estado_${codigo}`);
+
+  if (btnPopup) {
+    btnPopup.classList.toggle("activo", esVisitado);
+    btnPopup.style.background = esVisitado ? "#2e7d32" : "#1b365d";
+    btnPopup.innerText = esVisitado ? "✓ Visitado" : "Marcar Visitado";
+  }
+  if (labelPopup) {
+    labelPopup.innerText = textoDetalle;
+  }
+  if (selectPopup) {
+    selectPopup.value = estado;
+  }
+  if (fechaPopup && estado === "normal") {
+    fechaPopup.value = mapa.obtenerFechaHoy();
+  }
+};
+
+window.seleccionarSugerencia = (i) => {
+  if (!sugerenciasActuales[i]) return;
+  inputLugar.value = sugerenciasActuales[i].nombre;
+  cajaSugerencias.classList.remove("show");
+  buscarLugarYRenderizar();
+};
+
+// ==========================================
+// 4. AUTOCOMPLETADO Y SUGERENCIAS
+// ==========================================
+function actualizarSugerencias() {
+  const query = api.normalizarTexto(inputLugar.value.trim());
+  indiceActivo = -1;
+
+  if (!query) {
+    cajaSugerencias.classList.remove("show");
+    return sugerenciasActuales = [];
+  }
+
+  sugerenciasActuales = api.diccionarioLugares.filter(l => api.normalizarTexto(l.nombre).includes(query)).slice(0, 40);
+
+  if (!sugerenciasActuales.length) {
+    cajaSugerencias.innerHTML = `<div class="sugerencia-item" style="color: #888;">Sin coincidencias</div>`;
+    return cajaSugerencias.classList.add("show");
+  }
+
+  cajaSugerencias.innerHTML = sugerenciasActuales.map((lugar, i) => `
+    <div class="sugerencia-item" onclick="window.seleccionarSugerencia(${i})">
+      <span>${mapa.escaparHTML(lugar.nombre)}</span>
+      <span class="badge-tipo ${lugar.tipo === 'Municipio' ? 'badge-municipio' : 'badge-distrito'}">${lugar.tipo}</span>
+    </div>`
+  ).join('');
+  
+  cajaSugerencias.classList.add("show");
+}
+
+function manejarTecladoSugerencias(e) {
+  const items = cajaSugerencias.querySelectorAll(".sugerencia-item");
+  if (!cajaSugerencias.classList.contains("show") || !items.length) return;
+
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    indiceActivo = e.key === "ArrowDown" ? Math.min(indiceActivo + 1, items.length - 1) : Math.max(indiceActivo - 1, 0);
+    items.forEach((el, i) => el.classList.toggle("activa", i === indiceActivo));
+    if (items[indiceActivo]) items[indiceActivo].scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (indiceActivo >= 0) window.seleccionarSugerencia(indiceActivo);
+    else { cajaSugerencias.classList.remove("show"); buscarLugarYRenderizar(); }
+  } else if (e.key === "Escape") {
+    cajaSugerencias.classList.remove("show");
+  }
+}
+
+document.addEventListener("click", (e) => {
+  if (cajaSugerencias && !cajaSugerencias.contains(e.target) && e.target !== inputLugar) {
+    cajaSugerencias.classList.remove("show");
+  }
+});
