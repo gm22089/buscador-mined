@@ -25,7 +25,6 @@ async function iniciarApp() {
     
     estadoText.innerHTML = `⏳ Descargando listado de lugares actualizados...`;
 
-    // Cargar en paralelo manejando posibles errores
     await Promise.all([
       db.cargarEstadosIniciales().catch(err => {
         console.warn("Advertencia Firebase:", err);
@@ -39,12 +38,10 @@ async function iniciarApp() {
 
     estadoText.innerHTML = `<span class="estado-ok">✅ Zonas listas. Escribe un municipio o distrito.</span>`;
     
-    // Habilitar controles de la interfaz
     inputLugar.disabled = false;
     btnBuscar.disabled = false;
     inputLugar.focus();
 
-    // Asignación explícita de eventos
     btnBuscar.addEventListener("click", buscarLugarYRenderizar);
     inputLugar.addEventListener("input", actualizarSugerencias);
     inputLugar.addEventListener("keydown", manejarTecladoSugerencias);
@@ -55,7 +52,6 @@ async function iniciarApp() {
   }
 }
 
-// Ejecutar automáticamente al cargar el documento (Compatible con type="module")
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", iniciarApp);
 } else {
@@ -113,52 +109,53 @@ window.llevarAlBuscador = (codigo) => {
 
 window.guardarEstadoBD = async (codigo) => {
   const selectElem = document.getElementById(`select_estado_${codigo}`);
+  const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
   if (!selectElem) return;
   
   const nuevoEstado = selectElem.value;
-  try {
-    const info = await db.guardarEstado(codigo, nuevoEstado);
-    
-    const labelElem = document.getElementById(`label_estado_${codigo}`);
-    if (labelElem) labelElem.innerText = `${info.estado} el ${info.fecha}`;
-    
-    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
-    if (marcadorInfo) marcadorInfo.marcador.setIcon(mapa.crearIcono(true, info.estado));
-
-    // Sincronizar botón rápido en tarjeta y popup si existe
-    window.actualizarUIEstado(codigo, info.estado);
-  } catch (error) {
-    alert(error.message);
-  }
-};
-
-// Alternar visita directa en 1 Clic (Móvil y Escritorio)
-window.toggleVisitaRapida = async (codigo) => {
-  const estadoActual = db.getEstado(codigo).estado;
-  const nuevoEstado = (estadoActual === "visitado") ? "normal" : "visitado";
+  const fechaSeleccionada = fechaElem ? fechaElem.value : null;
 
   try {
-    const info = await db.guardarEstado(codigo, nuevoEstado);
-
-    // 1. Actualizar icono del pin en el mapa
+    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada);
+    
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
     }
 
-    // 2. Sincronizar elementos UI (Popups y Tarjetas)
-    window.actualizarUIEstado(codigo, info.estado, info.fecha);
-
+    window.actualizarUIEstado(codigo, info.estado, info.fecha, info.usuario);
   } catch (error) {
     alert(error.message);
   }
 };
 
-// Función auxiliar para actualizar los elementos DOM en paralelo
-window.actualizarUIEstado = (codigo, estado, fecha = "") => {
-  const esVisitado = estado === "visitado";
+// Alternar visita directa en 1 Clic (respeta la fecha elegida en el popup si está abierto, o usa hoy)
+window.toggleVisitaRapida = async (codigo) => {
+  const estadoActual = db.getEstado(codigo).estado;
+  const nuevoEstado = (estadoActual === "visitado") ? "normal" : "visitado";
+  const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
+  const fechaSeleccionada = fechaElem ? fechaElem.value : null;
 
-  // Actualizar Tarjeta Lateral
+  try {
+    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada);
+
+    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
+    if (marcadorInfo) {
+      marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
+    }
+
+    window.actualizarUIEstado(codigo, info.estado, info.fecha, info.usuario);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+// Sincroniza textos, fechas y nombres de visitante en Popup y Tarjeta Lateral
+window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
+  const esVisitado = estado === "visitado";
+  const textoDetalle = mapa.formatearDetalleEstado({ estado, fecha, usuario });
+
+  // 1. Actualizar Tarjeta Lateral
   const card = document.getElementById(`card-ce-${codigo}`);
   const btnCard = document.getElementById(`btn-visita-${codigo}`);
   const badgeCard = document.getElementById(`badge-estado-${codigo}`);
@@ -166,27 +163,35 @@ window.actualizarUIEstado = (codigo, estado, fecha = "") => {
   if (card) card.classList.toggle("visitado", esVisitado);
   if (btnCard) {
     btnCard.classList.toggle("activo", esVisitado);
+    btnCard.style.background = esVisitado ? "#2e7d32" : "#e2e8f0";
+    btnCard.style.color = esVisitado ? "#fff" : "#1e293b";
     btnCard.innerText = esVisitado ? "✓ Visitado" : "Marcar Visita";
   }
   if (badgeCard) {
     badgeCard.className = `badge-estado-texto ${estado}`;
-    badgeCard.innerText = esVisitado ? "✓ Visitado" : estado === "intervenido" ? "🟠 Intervenido" : estado === "cerrado" ? "🔴 Cerrado" : "⏳ Pendiente";
+    badgeCard.style.color = esVisitado ? "#2e7d32" : "#64748b";
+    badgeCard.innerText = textoDetalle;
   }
 
-  // Actualizar Popup dentro del Mapa (Celular)
+  // 2. Actualizar Popup dentro del Mapa
   const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
   const labelPopup = document.getElementById(`label_estado_${codigo}`);
   const selectPopup = document.getElementById(`select_estado_${codigo}`);
+  const fechaPopup = document.getElementById(`fecha_estado_${codigo}`);
 
   if (btnPopup) {
     btnPopup.classList.toggle("activo", esVisitado);
+    btnPopup.style.background = esVisitado ? "#2e7d32" : "#1b365d";
     btnPopup.innerText = esVisitado ? "✓ Visitado" : "Marcar Visitado";
   }
   if (labelPopup) {
-    labelPopup.innerText = esVisitado ? `Visitado el ${fecha}` : "Sin Visitar";
+    labelPopup.innerText = textoDetalle;
   }
   if (selectPopup) {
     selectPopup.value = estado;
+  }
+  if (fechaPopup && estado === "normal") {
+    fechaPopup.value = mapa.obtenerFechaHoy();
   }
 };
 
