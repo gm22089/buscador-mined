@@ -16,6 +16,7 @@ const inputFin = document.getElementById("fechaFin");
 const selUsuario = document.getElementById("filtroUsuario");
 const selDepto = document.getElementById("filtroDepto");
 const selMuni = document.getElementById("filtroMuni");
+const selDistrito = document.getElementById("filtroDistrito");
 
 async function iniciarEstadisticas() {
   try {
@@ -29,7 +30,7 @@ async function iniciarEstadisticas() {
       mapaPorCodigo[ce.codigo] = ce;
     });
 
-    // Unir datos de Firebase (estado, fecha, usuario) con datos de Power BI (nombre, depto, muni)
+    // Unir datos de Firebase (estado, fecha, usuario) con datos de Power BI (nombre, depto, muni, distrito)
     registrosBD = Object.entries(estadosDict).map(([codigo, info]) => {
       const ce = mapaPorCodigo[codigo] || {
         nombre: "Centro Educativo no encontrado en catálogo",
@@ -61,7 +62,7 @@ async function iniciarEstadisticas() {
 }
 
 function poblarFiltros() {
-  // 1. Usuarios únicos (ignorando diferencias de mayúsculas/minúsculas al agrupar)
+  // 1. Usuarios únicos
   const usuariosUnicos = [...new Set(registrosBD.map(r => r.usuario))].sort((a, b) => a.localeCompare(b, 'es'));
   usuariosUnicos.forEach(u => {
     const opt = document.createElement("option");
@@ -97,14 +98,37 @@ function actualizarSelectorMunicipios() {
     opt.textContent = m;
     selMuni.appendChild(opt);
   });
+
+  actualizarSelectorDistritos();
+}
+
+function actualizarSelectorDistritos() {
+  const deptoSeleccionado = selDepto.value;
+  const muniSeleccionado = selMuni.value;
+  selDistrito.innerHTML = `<option value="TODOS">Todos los distritos</option>`;
+
+  const base = catalogoNacional.filter(c => {
+    if (deptoSeleccionado !== "TODOS" && c.departamento !== deptoSeleccionado) return false;
+    if (muniSeleccionado !== "TODOS" && c.municipio !== muniSeleccionado) return false;
+    return true;
+  });
+
+  const distritosUnicos = [...new Set(base.map(c => c.distrito))].sort((a, b) => a.localeCompare(b, 'es'));
+  distritosUnicos.forEach(dist => {
+    const opt = document.createElement("option");
+    opt.value = dist;
+    opt.textContent = dist;
+    selDistrito.appendChild(opt);
+  });
 }
 
 function aplicarFiltros() {
-  const fInicio = inputInicio.value; // Formato YYYY-MM-DD
-  const fFin = inputFin.value;       // Formato YYYY-MM-DD
+  const fInicio = inputInicio.value;
+  const fFin = inputFin.value;
   const uSel = selUsuario.value;
   const dSel = selDepto.value;
   const mSel = selMuni.value;
+  const distSel = selDistrito.value;
 
   // Filtrar los registros guardados en Firebase
   registrosFiltrados = registrosBD.filter(r => {
@@ -114,13 +138,15 @@ function aplicarFiltros() {
     if (uSel !== "TODOS" && r.usuario !== uSel) return false;
     if (dSel !== "TODOS" && r.departamento !== dSel) return false;
     if (mSel !== "TODOS" && r.municipio !== mSel) return false;
+    if (distSel !== "TODOS" && r.distrito !== distSel) return false;
     return true;
   });
 
-  // Filtrar el catálogo base para que los porcentajes correspondan al departamento/municipio elegido
+  // Filtrar el catálogo base para que los porcentajes correspondan a la zona elegida
   const catalogoFiltrado = catalogoNacional.filter(c => {
     if (dSel !== "TODOS" && c.departamento !== dSel) return false;
     if (mSel !== "TODOS" && c.municipio !== mSel) return false;
+    if (distSel !== "TODOS" && c.distrito !== distSel) return false;
     return true;
   });
 
@@ -128,6 +154,7 @@ function aplicarFiltros() {
   renderTablaUsuarios(registrosFiltrados);
   renderTablaDepartamentos(catalogoFiltrado, registrosFiltrados);
   renderTablaMunicipios(catalogoFiltrado, registrosFiltrados);
+  renderTablaDistritos(catalogoFiltrado, registrosFiltrados);
   renderTablaDetalle(registrosFiltrados);
 }
 
@@ -243,12 +270,48 @@ function renderTablaMunicipios(catalogoBase, filtrados) {
   }).join("");
 }
 
+function renderTablaDistritos(catalogoBase, filtrados) {
+  const tbody = document.getElementById("tbodyDistritos");
+  const stats = {};
+
+  catalogoBase.forEach(c => {
+    const key = `${c.departamento}|${c.municipio}|${c.distrito}`;
+    if (!stats[key]) {
+      stats[key] = { distrito: c.distrito, municipio: c.municipio, depto: c.departamento, total: 0, visitados: 0 };
+    }
+    stats[key].total++;
+  });
+
+  filtrados.forEach(r => {
+    const key = `${r.departamento}|${r.municipio}|${r.distrito}`;
+    if (r.estado === "visitado" && stats[key]) {
+      stats[key].visitados++;
+    }
+  });
+
+  const lista = Object.values(stats).sort((a, b) => (b.visitados / b.total) - (a.visitados / a.total));
+
+  tbody.innerHTML = lista.map(dist => {
+    const pct = dist.total > 0 ? ((dist.visitados / dist.total) * 100).toFixed(1) : 0;
+    return `
+      <tr>
+        <td><strong>${escaparHTML(dist.distrito)}</strong> <span style="font-size:11px; color:#64748b;">(${escaparHTML(dist.municipio)})</span></td>
+        <td>${dist.visitados} / ${dist.total}</td>
+        <td>
+          <strong>${pct}%</strong>
+          <div class="barra-progreso"><div class="barra-progreso-fill" style="width:${Math.min(pct, 100)}%"></div></div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
 function renderTablaDetalle(filtrados) {
   const tbody = document.getElementById("tbodyDetalle");
   document.getElementById("totalDetalle").textContent = filtrados.length;
 
   if (!filtrados.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#64748b;">No hay centros educativos para los filtros seleccionados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#64748b;">No hay centros educativos para los filtros seleccionados.</td></tr>`;
     return;
   }
 
@@ -260,6 +323,7 @@ function renderTablaDetalle(filtrados) {
       <td>${escaparHTML(r.nombre)}</td>
       <td>${escaparHTML(r.departamento)}</td>
       <td>${escaparHTML(r.municipio)}</td>
+      <td>${escaparHTML(r.distrito)}</td>
       <td><span class="pill-estado pill-${r.estado}">${r.estado.toUpperCase()}</span></td>
       <td>${escaparHTML(r.fecha)}</td>
       <td><strong>${escaparHTML(r.usuario)}</strong></td>
@@ -299,11 +363,17 @@ function escaparHTML(str) {
   return div.innerHTML;
 }
 
-// Eventos
+// Eventos en cascada (Departamento -> Municipio -> Distrito)
 selDepto.addEventListener("change", () => {
   actualizarSelectorMunicipios();
   aplicarFiltros();
 });
+selMuni.addEventListener("change", () => {
+  actualizarSelectorDistritos();
+  aplicarFiltros();
+});
+selDistrito.addEventListener("change", aplicarFiltros);
+
 document.getElementById("btnFiltrar").addEventListener("click", aplicarFiltros);
 document.getElementById("btnLimpiar").addEventListener("click", () => {
   inputInicio.value = "";

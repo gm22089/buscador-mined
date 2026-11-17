@@ -9,7 +9,7 @@
   <style>
     .filtros-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 12px;
       align-items: end;
       margin-bottom: 18px;
@@ -64,7 +64,7 @@
 
     .paneles-estadisticas {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
       gap: 18px;
       margin-bottom: 20px;
     }
@@ -89,6 +89,7 @@
       font-size: 12px;
       color: #475569;
       border-bottom: 2px solid #e2e8f0;
+      z-index: 1;
     }
     .tabla-datos td {
       padding: 8px;
@@ -129,7 +130,7 @@
       <span class="eyebrow">Ministerio de Educación</span>
     </div>
     <h1>Panel de Estadísticas y Seguimiento</h1>
-    <p class="sub">Consulta el avance de visitas por usuario, departamento, municipio y rango de fechas.</p>
+    <p class="sub">Consulta el avance de visitas por usuario, departamento, municipio, distrito y rango de fechas.</p>
     
     <nav class="subnav">
       <a href="index.html">🔎 Buscar por código o nombre</a>
@@ -169,6 +170,12 @@
           <label for="filtroMuni">Municipio:</label>
           <select id="filtroMuni">
             <option value="TODOS">Todos los municipios</option>
+          </select>
+        </div>
+        <div class="campo-filtro">
+          <label for="filtroDistrito">Distrito:</label>
+          <select id="filtroDistrito">
+            <option value="TODOS">Todos los distritos</option>
           </select>
         </div>
         <div class="botones-filtro">
@@ -244,7 +251,7 @@
 
       <!-- PANEL POR MUNICIPIO -->
       <div class="panel">
-        <h2>📍 Avance por Municipio</h2>
+        <h2>🏙️ Avance por Municipio</h2>
         <p class="desc">Desglose municipal ordenado por porcentaje de cumplimiento.</p>
         <div class="tabla-wrapper">
           <table class="tabla-datos">
@@ -256,6 +263,24 @@
               </tr>
             </thead>
             <tbody id="tbodyMunicipios"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PANEL POR DISTRITO -->
+      <div class="panel">
+        <h2>📍 Avance por Distrito</h2>
+        <p class="desc">Desglose distrital ordenado por porcentaje de cumplimiento.</p>
+        <div class="tabla-wrapper">
+          <table class="tabla-datos">
+            <thead>
+              <tr>
+                <th>Distrito (Municipio)</th>
+                <th>Visit. / Total</th>
+                <th style="width: 110px;">% Avance</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyDistritos"></tbody>
           </table>
         </div>
       </div>
@@ -279,6 +304,7 @@
               <th>Centro Educativo</th>
               <th>Departamento</th>
               <th>Municipio</th>
+              <th>Distrito</th>
               <th>Estado</th>
               <th>Fecha</th>
               <th>Usuario</th>
@@ -290,7 +316,7 @@
     </div>
   </main>
 
-  <!-- Librerías de Firebase (Misma versión que mapa.html) -->
+  <!-- Librerías de Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
