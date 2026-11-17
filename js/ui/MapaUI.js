@@ -29,9 +29,11 @@ export class MapaUI {
     const fecha = infoBD?.fecha && infoBD.fecha !== "N/A" ? infoBD.fecha : "";
     const usuario = infoBD?.usuario ? ` por ${infoBD.usuario}` : "";
     const tagDesmontado = infoBD?.desmontado ? " (Desmontado)" : "";
+    const remotosTxt = infoBD?.totalRemotos > 0 ? ` · 💻 ${infoBD.totalRemotos} remoto(s)` : "";
 
-    if (estado === "visitado") return `Visitado el ${fecha}${usuario}`;
-    if (estado === "intervenido") return `Intervenido${tagDesmontado} el ${fecha}${usuario}`;
+    if (estado === "visitado") return `Visitado el ${fecha}${usuario}${remotosTxt}`;
+    if (estado === "remoto") return `Trabajo Remoto el ${fecha}${usuario}${remotosTxt}`;
+    if (estado === "intervenido") return `Intervenido${tagDesmontado} el ${fecha}${usuario}${remotosTxt}`;
     if (estado === "cerrado") return `Cerrado el ${fecha}${usuario}`;
     if (infoBD?.historial?.length > 0) return `Sin Visitar (${infoBD.historial.length} reg. previos)`;
     return "Sin Visitar";
@@ -43,22 +45,27 @@ export class MapaUI {
     const usuario = infoBD?.usuario ? ` · ${infoBD.usuario}` : "";
     const tagDesmontado = infoBD?.desmontado ? " · Desmontado" : "";
     const tagVisitas = (infoBD?.totalVisitas > 1) ? ` [${infoBD.totalVisitas}x]` : "";
+    const tagRemotos = (infoBD?.totalRemotos > 0) ? ` [💻${infoBD.totalRemotos}]` : "";
 
-    if (estado === "visitado") return `✓ Visitado${tagVisitas} (${fecha}${usuario})`;
-    if (estado === "intervenido") return `🟠 Intervenido${tagDesmontado} (${fecha}${usuario})`;
+    if (estado === "visitado") return `✓ Visitado${tagVisitas}${tagRemotos} (${fecha}${usuario})`;
+    if (estado === "remoto") return `💻 Remoto${tagRemotos} (${fecha}${usuario})`;
+    if (estado === "intervenido") return `🟠 Intervenido${tagDesmontado}${tagRemotos} (${fecha}${usuario})`;
     if (estado === "cerrado") return `🔴 Cerrado (${fecha}${usuario})`;
     if (infoBD?.historial?.length > 0) return `⏳ Pendiente (Hist: ${infoBD.historial.length})`;
     return "⏳ Pendiente";
   }
 
-  renderHistorialHTML(historial) {
+  renderHistorialHTML(codigo, historial) {
     if (!Array.isArray(historial) || historial.length === 0) return "";
-    const recientes = [...historial].reverse();
+    const hoy = this.obtenerFechaHoy();
+    const total = historial.length;
 
-    const items = recientes.map(h => {
+    const items = [...historial].reverse().map((h, idxVisual) => {
+      const indiceReal = total - 1 - idxVisual;
       let icono = "📌";
       let etiqueta = h.accion;
       if (h.accion === "visitado") { icono = "✅"; etiqueta = "Visitado"; }
+      if (h.accion === "remoto") { icono = "💻"; etiqueta = "Remoto"; }
       if (h.accion === "intervenido") {
         icono = "🟠";
         etiqueta = h.desmontado ? "Intervenido (Desmontado)" : "Intervenido";
@@ -66,15 +73,27 @@ export class MapaUI {
       if (h.accion === "cerrado") { icono = "🔴"; etiqueta = "Cerrado"; }
       if (h.accion === "reiniciado") { icono = "🔄"; etiqueta = "Pasó a Sin Visitar"; }
 
-      return `<div style="padding:3px 0; border-bottom:1px dashed #cbd5e1; font-size:10.5px;">
-        ${icono} <strong>${this.escaparHTML(etiqueta)}</strong> · ${this.escaparHTML(h.fecha)} <span style="color:#475569;">(${this.escaparHTML(h.usuario)})</span>
-      </div>`;
+      return `
+        <div style="padding:4px 0; border-bottom:1px dashed #cbd5e1; font-size:10.5px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
+            <span>${icono} <strong>${this.escaparHTML(etiqueta)}</strong> · ${this.escaparHTML(h.fecha)} <span style="color:#475569;">(${this.escaparHTML(h.usuario)})</span></span>
+            <span style="display:inline-flex; gap:3px; flex-shrink:0;">
+              <button onclick="window.abrirEditFechaMapa('${codigo}', ${indiceReal})" title="Corregir fecha" style="border:none; background:#e2e8f0; border-radius:3px; padding:1px 4px; cursor:pointer; font-size:10px;">✏️</button>
+              <button onclick="window.eliminarHistMapa('${codigo}', ${indiceReal})" title="Eliminar" style="border:none; background:#fee2e2; color:#991b1b; border-radius:3px; padding:1px 4px; cursor:pointer; font-size:10px;">🗑️</button>
+            </span>
+          </div>
+          <div id="edit_mapa_${codigo}_${indiceReal}" style="display:none; margin-top:4px; gap:4px; align-items:center;">
+            <input type="date" id="inp_fecha_mapa_${codigo}_${indiceReal}" value="${this.escaparHTML(h.fecha)}" max="${hoy}" style="flex:1; padding:2px 4px; font-size:10.5px;">
+            <button onclick="window.guardarEditFechaMapa('${codigo}', ${indiceReal})" style="background:#2563eb; color:#fff; border:none; border-radius:3px; padding:3px 6px; font-size:10px; cursor:pointer;">OK</button>
+          </div>
+        </div>
+      `;
     }).join("");
 
     return `
       <div style="margin-top:8px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:5px; padding:6px;">
-        <div style="font-size:10.5px; font-weight:700; color:#14375E; margin-bottom:3px;">📋 Historial registrado (${historial.length}):</div>
-        <div style="max-height:85px; overflow-y:auto;">${items}</div>
+        <div style="font-size:10.5px; font-weight:700; color:#14375E; margin-bottom:3px;">📋 Historial (${total}) — ✏️ editar fecha:</div>
+        <div style="max-height:95px; overflow-y:auto;">${items}</div>
       </div>
     `;
   }
@@ -83,7 +102,8 @@ export class MapaUI {
     let color = "#14375E"; 
     if (!esSeleccionado) {
       if (estadoBD === "visitado") color = "#28a745";
-      if (estadoBD === "intervenido") color = "#fd7e14"; // Mismo color naranja incluso si está desmontado
+      if (estadoBD === "remoto") color = "#7c3aed";
+      if (estadoBD === "intervenido") color = "#fd7e14";
       if (estadoBD === "cerrado") color = "#dc3545";
     } else {
       color = "#B8892B"; 
@@ -133,38 +153,44 @@ export class MapaUI {
     const esVisitado = colorEstado === "visitado";
     const textoEstado = this.formatearTextoPopup(infoBD);
     const hoy = this.obtenerFechaHoy();
-    const historialHTML = this.renderHistorialHTML(infoBD.historial);
-
-    // Por defecto carga la fecha de hoy para facilitar nuevas visitas en fechas distintas
-    const fechaInputVal = hoy;
+    const historialHTML = this.renderHistorialHTML(codigo, infoBD.historial);
     const mostrarDesmontado = colorEstado === "intervenido" ? "block" : "none";
 
     return `
-      <div class="popup-mined" style="min-width: 240px;">
+      <div class="popup-mined" style="min-width: 245px;">
         <h4 style="margin: 0 0 4px 0; color: #14375E;">INFRA: ${this.escaparHTML(String(codigo))}</h4>
         <p style="margin: 0 0 4px 0; font-weight: bold; font-size: 13px;">${this.escaparHTML(nombre || "Sin nombre")}</p>
         <p style="margin: 0 0 6px 0; font-size: 11px; color: #666;"><strong>Distrito:</strong> ${this.escaparHTML(distrito || "")}</p>
         
-        <button id="btn-popup-visita-${codigo}" 
-                class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" 
-                onclick="window.toggleVisitaRapida('${codigo}')" 
-                style="width: 100%; margin: 6px 0; padding: 7px;">
-          ${esVisitado ? '✓ Visitado (Registrar otra fecha)' : 'Marcar Visitado'}
-        </button>
+        <!-- Dos botones permanentes de 1 clic -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0;">
+          <button id="btn-popup-visita-${codigo}" 
+                  class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" 
+                  onclick="window.toggleVisitaRapida('${codigo}')" 
+                  style="padding: 7px 5px; font-size: 11.5px;">
+            ${esVisitado ? `✓ Visitado (${infoBD.totalVisitas})` : '✓ Visitado'}
+          </button>
+          <button id="btn-popup-remoto-${codigo}" 
+                  onclick="window.registrarRemotoRapido('${codigo}')" 
+                  style="padding: 7px 5px; font-size: 11.5px; background: #7c3aed; color: #fff; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;">
+            ${infoBD.totalRemotos > 0 ? `💻 Remoto (${infoBD.totalRemotos})` : '💻 Remoto'}
+          </button>
+        </div>
 
         <div style="background: #e2e8f0; padding: 8px; border-radius: 6px; margin-bottom: 8px;">
           <p style="margin: 0 0 6px 0; font-size: 11px; color: #333;">
-            <strong>Estado actual:</strong> <span id="label_estado_${codigo}">${this.escaparHTML(textoEstado)}</span>
+            <strong>Estado:</strong> <span id="label_estado_${codigo}">${this.escaparHTML(textoEstado)}</span>
           </p>
 
-          <label for="fecha_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Fecha de visita / gestión:</label>
-          <input type="date" id="fecha_estado_${codigo}" value="${fechaInputVal}" max="${hoy}" 
+          <label for="fecha_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Fecha de visita / remoto:</label>
+          <input type="date" id="fecha_estado_${codigo}" value="${hoy}" max="${hoy}" 
                  style="width: 100%; padding: 4px; font-size: 11px; margin-bottom: 6px; box-sizing: border-box;">
 
-          <label for="select_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Estado:</label>
+          <label for="select_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Otro estado:</label>
           <select id="select_estado_${codigo}" onchange="window.toggleCheckDesmontado('${codigo}')" style="width: 100%; padding: 4px; font-size: 11px; margin-bottom: 6px;">
              <option value="normal" ${colorEstado === 'normal' ? 'selected' : ''}>Sin Visitar</option>
              <option value="visitado" ${colorEstado === 'visitado' ? 'selected' : ''}>Visitado (Verde)</option>
+             <option value="remoto" ${colorEstado === 'remoto' ? 'selected' : ''}>Trabajo Remoto (Morado)</option>
              <option value="intervenido" ${colorEstado === 'intervenido' ? 'selected' : ''}>Intervenido (Naranja)</option>
              <option value="cerrado" ${colorEstado === 'cerrado' ? 'selected' : ''}>Cerrado (Rojo)</option>
           </select>
@@ -228,6 +254,10 @@ export class MapaUI {
               <button class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" id="btn-visita-${codigo}" 
                       onclick="event.stopPropagation(); window.toggleVisitaRapida('${codigo}')">
                 ${esVisitado ? '✓ Visitado' : 'Marcar Visita'}
+              </button>
+              <button id="btn-remoto-${codigo}" onclick="event.stopPropagation(); window.registrarRemotoRapido('${codigo}')"
+                      style="padding: 6px 8px; background: #7c3aed; color: #fff; border: none; border-radius: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer;">
+                💻 Remoto
               </button>
               <button class="btn-ver-expediente" onclick="event.stopPropagation(); window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')">
                 Expediente ↗

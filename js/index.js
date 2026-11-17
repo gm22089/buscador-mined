@@ -109,11 +109,9 @@ if (document.readyState === "loading") {
   iniciarAppIndex();
 }
 
+
 // ==========================================
-// GESTIÓN DE ESTADO DE VISITA (FIREBASE)
-// ==========================================
-// ==========================================
-// GESTIÓN DE ESTADO DE VISITA (FIREBASE)
+// GESTIÓN DE ESTADO DE VISITA Y REMOTO (FIREBASE)
 // ==========================================
 function actualizarIndicadorSesion() {
   const spanSesion = document.getElementById("infoSesionIndex");
@@ -122,7 +120,7 @@ function actualizarIndicadorSesion() {
   if (db.usuarioActual) {
     spanSesion.innerHTML = `👤 <strong>${escapingHTML(db.usuarioActual)}</strong> · <a href="#" onclick="event.preventDefault(); cerrarSesionUsuarioIndex();" style="color:#dc2626; text-decoration:underline;">Salir</a>`;
   } else {
-    spanSesion.innerHTML = `🔒 Requiere usuario y PIN para marcar`;
+    spanSesion.innerHTML = `🔒 Requiere usuario y PIN`;
   }
 }
 
@@ -130,7 +128,7 @@ function cerrarSesionUsuarioIndex() {
   localStorage.removeItem("usuario_ce_mapa");
   db.usuarioActual = null;
   actualizarIndicadorSesion();
-  mostrarToast("Sesión cerrada. Se pedirá usuario y PIN al guardar.");
+  mostrarToast("Sesión cerrada.");
 }
 
 function toggleDesmontadoIndex() {
@@ -150,11 +148,17 @@ function renderHistorialIndex(historial) {
     return;
   }
 
-  const recientes = [...historial].reverse();
-  const filas = recientes.map(h => {
+  const hoy = db.obtenerFechaLocal();
+  const total = historial.length;
+
+  // Mostramos del más reciente al más antiguo, conservando su índice real en el arreglo
+  const filas = [...historial].reverse().map((h, idxVisual) => {
+    const indiceReal = total - 1 - idxVisual;
     let badge = h.accion.toUpperCase();
     let color = "#475569";
+
     if (h.accion === "visitado") { badge = "✓ VISITADO"; color = "#166534"; }
+    if (h.accion === "remoto") { badge = "💻 REMOTO"; color = "#6d28d9"; }
     if (h.accion === "intervenido") {
       badge = h.desmontado ? "🟠 INTERVENIDO (DESMONTADO)" : "🟠 INTERVENIDO";
       color = "#9a3412";
@@ -163,9 +167,21 @@ function renderHistorialIndex(historial) {
     if (h.accion === "reiniciado") { badge = "🔄 PASÓ A SIN VISITAR"; color = "#1e3a8a"; }
 
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:11.5px;">
-        <span style="font-weight:700; color:${color};">${badge}</span>
-        <span style="color:#334155;">${escapingHTML(h.fecha)} · <strong>${escapingHTML(h.usuario)}</strong></span>
+      <div style="padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:11.5px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+          <span style="font-weight:700; color:${color};">${badge}</span>
+          <div style="display:flex; align-items:center; gap:5px;">
+            <span style="color:#334155;">${escapingHTML(h.fecha)} · <strong>${escapingHTML(h.usuario)}</strong></span>
+            <button onclick="abrirEditorFechaIndex(${indiceReal})" title="Corregir fecha" style="border:none; background:#e2e8f0; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">✏️</button>
+            <button onclick="eliminarRegistroIndex(${indiceReal})" title="Eliminar registro" style="border:none; background:#fee2e2; color:#991b1b; border-radius:4px; padding:2px 5px; cursor:pointer; font-size:11px;">🗑️</button>
+          </div>
+        </div>
+        <!-- Mini editor inline oculto hasta que toquen ✏️ -->
+        <div id="edit_row_index_${indiceReal}" style="display:none; margin-top:5px; background:#fff; padding:5px; border-radius:5px; border:1px solid #cbd5e1; align-items:center; gap:6px;">
+          <input type="date" id="input_edit_fecha_${indiceReal}" value="${escapingHTML(h.fecha)}" max="${hoy}" style="flex:1; padding:3px 5px; font-size:11.5px; border:1px solid #94a3b8; border-radius:4px;">
+          <button onclick="guardarFechaEditadaIndex(${indiceReal})" style="background:#2563eb; color:#fff; border:none; border-radius:4px; padding:4px 8px; font-size:11px; font-weight:700; cursor:pointer;">Guardar</button>
+          <button onclick="cerrarEditorFechaIndex(${indiceReal})" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:4px; padding:4px 6px; font-size:11px; cursor:pointer;">✕</button>
+        </div>
       </div>
     `;
   }).join("");
@@ -173,13 +189,52 @@ function renderHistorialIndex(historial) {
   cont.innerHTML = `
     <div style="border-top: 1px solid #cbd5e1; padding-top: 8px;">
       <div style="font-size: 11px; font-weight: 700; color: #14375E; text-transform: uppercase; margin-bottom: 4px;">
-        📋 Historial de Visitas y Gestiones (${historial.length})
+        📋 Historial (${total}) — Toca ✏️ para corregir fecha
       </div>
-      <div style="max-height: 140px; overflow-y: auto; padding-right: 4px;">
+      <div style="max-height: 175px; overflow-y: auto; padding-right: 4px;">
         ${filas}
       </div>
     </div>
   `;
+}
+
+function abrirEditorFechaIndex(indiceReal) {
+  const row = document.getElementById(`edit_row_index_${indiceReal}`);
+  if (row) row.style.display = "flex";
+}
+
+function cerrarEditorFechaIndex(indiceReal) {
+  const row = document.getElementById(`edit_row_index_${indiceReal}`);
+  if (row) row.style.display = "none";
+}
+
+async function guardarFechaEditadaIndex(indiceReal) {
+  if (!codigoCEActual) return;
+  const input = document.getElementById(`input_edit_fecha_${indiceReal}`);
+  if (!input || !input.value) return;
+
+  try {
+    await db.editarFechaHistorial(codigoCEActual, indiceReal, input.value);
+    actualizarIndicadorSesion();
+    sincronizarPanelVisitaIndex(codigoCEActual);
+    mostrarToast("✅ Fecha corregida en el historial");
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function eliminarRegistroIndex(indiceReal) {
+  if (!codigoCEActual) return;
+  if (!confirm("¿Seguro que deseas eliminar este registro del historial?")) return;
+
+  try {
+    await db.eliminarRegistroHistorial(codigoCEActual, indiceReal);
+    actualizarIndicadorSesion();
+    sincronizarPanelVisitaIndex(codigoCEActual);
+    mostrarToast("🗑️ Registro eliminado");
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
 function sincronizarPanelVisitaIndex(codigo) {
@@ -191,28 +246,37 @@ function sincronizarPanelVisitaIndex(codigo) {
 
   const badge = document.getElementById("badgeEstadoIndex");
   const btnRapido = document.getElementById("btnVisitaRapidaIndex");
+  const btnRemoto = document.getElementById("btnRemotoRapidoIndex");
   const inputFecha = document.getElementById("fechaVisitaIndex");
   const selectEstado = document.getElementById("estadoSelectIndex");
   const chkDesmontado = document.getElementById("chkDesmontadoIndex");
 
   const fechaTexto = info.fecha && info.fecha !== "N/A" ? info.fecha : "";
   const usuarioTexto = info.usuario ? ` por ${info.usuario}` : "";
-  const tagVisitas = info.totalVisitas > 1 ? ` · (${info.totalVisitas} visitas en total)` : "";
+
+  const contadores = [];
+  if (info.totalVisitas > 0) contadores.push(`${info.totalVisitas} visita${info.totalVisitas > 1 ? 's' : ''}`);
+  if (info.totalRemotos > 0) contadores.push(`${info.totalRemotos} remoto${info.totalRemotos > 1 ? 's' : ''}`);
+  const resumenContadores = contadores.length > 0 ? ` · [${contadores.join(" | ")}]` : "";
 
   if (badge) {
     if (estado === "visitado") {
       badge.style.background = "#dcfce7";
       badge.style.color = "#166534";
-      badge.textContent = `✓ Visitado el ${fechaTexto}${usuarioTexto}${tagVisitas}`;
+      badge.textContent = `✓ Visitado (${fechaTexto}${usuarioTexto})${resumenContadores}`;
+    } else if (estado === "remoto") {
+      badge.style.background = "#ede9fe";
+      badge.style.color = "#5b21b6";
+      badge.textContent = `💻 Trabajo Remoto (${fechaTexto}${usuarioTexto})${resumenContadores}`;
     } else if (estado === "intervenido") {
       const tagDesm = info.desmontado ? " (Desmontado)" : "";
       badge.style.background = "#ffedd5";
       badge.style.color = "#9a3412";
-      badge.textContent = `🟠 Intervenido${tagDesm} el ${fechaTexto}${usuarioTexto}`;
+      badge.textContent = `🟠 Intervenido${tagDesm} (${fechaTexto}${usuarioTexto})${resumenContadores}`;
     } else if (estado === "cerrado") {
       badge.style.background = "#fee2e2";
       badge.style.color = "#991b1b";
-      badge.textContent = `🔴 Cerrado el ${fechaTexto}${usuarioTexto}`;
+      badge.textContent = `🔴 Cerrado (${fechaTexto}${usuarioTexto})${resumenContadores}`;
     } else {
       badge.style.background = "#e2e8f0";
       badge.style.color = "#1e293b";
@@ -224,7 +288,11 @@ function sincronizarPanelVisitaIndex(codigo) {
 
   if (btnRapido) {
     btnRapido.style.background = esVisitado ? "#2e7d32" : "#14375E";
-    btnRapido.textContent = esVisitado ? "✓ Visitado (Registrar nueva fecha)" : "✓ Marcar Visitado";
+    btnRapido.textContent = esVisitado ? `✓ Visitado (${info.totalVisitas})` : "✓ Marcar Visitado";
+  }
+
+  if (btnRemoto) {
+    btnRemoto.textContent = info.totalRemotos > 0 ? `💻 Remoto (${info.totalRemotos})` : "💻 Trabajo Remoto";
   }
 
   if (inputFecha) {
@@ -252,7 +320,21 @@ async function marcarVisitadoRapidoIndex() {
     await db.guardarEstado(codigoCEActual, "visitado", fechaElegida);
     actualizarIndicadorSesion();
     sincronizarPanelVisitaIndex(codigoCEActual);
-    mostrarToast("✅ Visita registrada en el historial");
+    mostrarToast("✅ Visita registrada");
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function marcarRemotoRapidoIndex() {
+  if (!codigoCEActual) return;
+  const fechaElegida = document.getElementById("fechaVisitaIndex")?.value || null;
+
+  try {
+    await db.guardarEstado(codigoCEActual, "remoto", fechaElegida, { mantenerVisitado: true });
+    actualizarIndicadorSesion();
+    sincronizarPanelVisitaIndex(codigoCEActual);
+    mostrarToast("💻 Trabajo remoto registrado");
   } catch (error) {
     alert(error.message);
   }
@@ -696,6 +778,11 @@ window.copiarSuperFetch = copiarSuperFetch;
 window.copiarAlPortapapeles = copiarAlPortapapeles;
 window.seleccionarSugerencia = seleccionarSugerencia;
 window.marcarVisitadoRapidoIndex = marcarVisitadoRapidoIndex;
+window.marcarRemotoRapidoIndex = marcarRemotoRapidoIndex;
 window.guardarEstadoIndex = guardarEstadoIndex;
 window.cerrarSesionUsuarioIndex = cerrarSesionUsuarioIndex;
 window.toggleDesmontadoIndex = toggleDesmontadoIndex;
+window.abrirEditorFechaIndex = abrirEditorFechaIndex;
+window.cerrarEditorFechaIndex = cerrarEditorFechaIndex;
+window.guardarFechaEditadaIndex = guardarFechaEditadaIndex;
+window.eliminarRegistroIndex = eliminarRegistroIndex;

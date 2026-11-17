@@ -48,11 +48,11 @@ export class FirebaseManager {
         fecha: "N/A",
         usuario: "",
         totalVisitas: 0,
+        totalRemotos: 0,
         historial: []
       };
     }
 
-    // Respalda automáticamente registros antiguos que aún no tenían arreglo 'historial'
     let historial = Array.isArray(raw.historial) ? [...raw.historial] : [];
     if (historial.length === 0 && raw.estado && raw.estado !== "normal") {
       historial.push({
@@ -64,6 +64,7 @@ export class FirebaseManager {
     }
 
     const totalVisitas = historial.filter(h => h.accion === "visitado").length;
+    const totalRemotos = historial.filter(h => h.accion === "remoto").length;
 
     return {
       estado: raw.estado || "normal",
@@ -71,6 +72,7 @@ export class FirebaseManager {
       fecha: raw.fecha || "N/A",
       usuario: raw.usuario || "",
       totalVisitas,
+      totalRemotos,
       historial
     };
   }
@@ -91,7 +93,7 @@ export class FirebaseManager {
     return datosUsuario.nombreMostrar || usuarioID;
   }
 
-  async guardarEstado(codigo, nuevoEstado, fechaPersonalizada = null, opciones = {}) {
+  async asegurarSesion() {
     if (!this.usuarioActual) {
       const usuarioInput = prompt("Ingresa tu usuario:");
       if (!usuarioInput) throw new Error("Debes ingresar un usuario para guardar.");
@@ -100,10 +102,13 @@ export class FirebaseManager {
       if (!pinInput) throw new Error("Debes ingresar tu clave.");
 
       const nombreVerificado = await this.verificarUsuarioEnFirebase(usuarioInput, pinInput);
-
       this.usuarioActual = nombreVerificado;
       localStorage.setItem("usuario_ce_mapa", this.usuarioActual);
     }
+  }
+
+  async guardarEstado(codigo, nuevoEstado, fechaPersonalizada = null, opciones = {}) {
+    await this.asegurarSesion();
 
     const fechaRegistro = (fechaPersonalizada && fechaPersonalizada.trim() !== "")
       ? fechaPersonalizada.trim()
@@ -114,7 +119,6 @@ export class FirebaseManager {
     const esDesmontado = (nuevoEstado === "intervenido") ? Boolean(opciones.desmontado) : false;
 
     if (nuevoEstado !== "normal") {
-      // Evita duplicar exactamente el mismo registro (mismo técnico + misma fecha + misma acción)
       const yaExisteIdentico = historial.some(item =>
         item.accion === nuevoEstado &&
         item.fecha === fechaRegistro &&
@@ -123,7 +127,7 @@ export class FirebaseManager {
       );
 
       if (yaExisteIdentico) {
-        throw new Error(`⚠️ Ya existe un registro de "${nuevoEstado}" por ${this.usuarioActual} en la fecha ${fechaRegistro}. Si es una nueva visita, selecciona otra fecha.`);
+        throw new Error(`⚠️ Ya registraste "${nuevoEstado}" en la fecha ${fechaRegistro}. Si deseas agregar otro registro, selecciona una fecha distinta.`);
       }
 
       historial.push({
@@ -134,7 +138,6 @@ export class FirebaseManager {
         registradoEn: new Date().toISOString()
       });
     } else if (actual.estado !== "normal") {
-      // Si pasa de intervenido/visitado/cerrado a "Sin Visitar", guarda el evento en el respaldo
       historial.push({
         accion: "reiniciado",
         desmontado: false,
@@ -144,19 +147,112 @@ export class FirebaseManager {
       });
     }
 
+    // Si el CE ya estaba "visitado" y se registra un trabajo "remoto" rápido, conserva el estado "visitado"
+    let estadoFinal = nuevoEstado;
+    if (nuevoEstado === "remoto" && opciones.mantenerVisitado && actual.estado === "visitado") {
+      estadoFinal = "visitado";
+    }
+
     const totalVisitas = historial.filter(h => h.accion === "visitado").length;
+    const totalRemotos = historial.filter(h => h.accion === "remoto").length;
 
     const datos = {
-      estado: nuevoEstado,
-      desmontado: esDesmontado,
+      estado: estadoFinal,
+      desmontado: estadoFinal === "intervenido" ? esDesmontado : false,
       fecha: fechaRegistro,
       usuario: this.usuarioActual,
       totalVisitas,
+      totalRemotos,
       historial
     };
 
     await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
     this.diccionarioEstados[codigo] = datos;
-    return datos;
+    return this.getEstado(codigo);
+  }
+
+  // Permite corregir una fecha mal ingresada directamente desde el historial
+  async editarFechaHistorial(codigo, indiceReal, nuevaFecha) {
+    await this.asegurarSesion();
+
+    if (!nuevaFecha || !/^\d{4}-\d{2}-\d{2}$/.test(nuevaFecha)) {
+      throw new Error("❌ Selecciona una fecha válida.");
+    }
+
+    const actual = this.getEstado(codigo);
+    const historial = [...actual.historial];
+
+    if (!historial[indiceReal]) {
+      throw new Error("❌ No se encontró el registro en el historial.");
+    }
+
+    historial[indiceReal] = {
+      ...historial[indiceReal],
+      fecha: nuevaFecha,
+      editadoPor: this.usuarioActual
+    };
+
+    // Si se editó el último registro, actualizar también la fecha principal del documento
+    const esUltimo = indiceReal === historial.length - 1;
+    const fechaPrincipal = esUltimo ? nuevaFecha : actual.fecha;
+
+    const totalVisitas = historial.filter(h => h.accion === "visitado").length;
+    const totalRemotos = historial.filter(h => h.accion === "remoto").length;
+
+    const datos = {
+      estado: actual.estado,
+      desmontado: actual.desmontado,
+      fecha: fechaPrincipal,
+      usuario: actual.usuario,
+      totalVisitas,
+      totalRemotos,
+      historial
+    };
+
+    await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
+    this.diccionarioEstados[codigo] = datos;
+    return this.getEstado(codigo);
+  }
+
+  // Permite eliminar un registro equivocado del historial
+  async eliminarRegistroHistorial(codigo, indiceReal) {
+    await this.asegurarSesion();
+
+    const actual = this.getEstado(codigo);
+    const historial = [...actual.historial];
+
+    if (!historial[indiceReal]) return actual;
+
+    historial.splice(indiceReal, 1);
+
+    const totalVisitas = historial.filter(h => h.accion === "visitado").length;
+    const totalRemotos = historial.filter(h => h.accion === "remoto").length;
+    const ultimo = historial[historial.length - 1];
+
+    let nuevoEstado = "normal";
+    let nuevaFecha = "N/A";
+    let nuevoUsuario = "";
+    let nuevoDesmontado = false;
+
+    if (ultimo) {
+      nuevoEstado = ultimo.accion === "reiniciado" ? "normal" : ultimo.accion;
+      nuevaFecha = ultimo.fecha || "N/A";
+      nuevoUsuario = ultimo.usuario || "";
+      nuevoDesmontado = Boolean(ultimo.desmontado);
+    }
+
+    const datos = {
+      estado: nuevoEstado,
+      desmontado: nuevoDesmontado,
+      fecha: nuevaFecha,
+      usuario: nuevoUsuario,
+      totalVisitas,
+      totalRemotos,
+      historial
+    };
+
+    await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
+    this.diccionarioEstados[codigo] = datos;
+    return this.getEstado(codigo);
   }
 }

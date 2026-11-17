@@ -55,8 +55,8 @@ async function buscarLugarYRenderizar() {
   const query = api.normalizarTexto(inputLugar.value.trim());
   if (!query) return estadoText.innerHTML = `<span class="error">Escribe un lugar antes de buscar.</span>`;
 
-  const lugar = api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre) === query) || 
-                api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre).includes(query));
+  const lugar = api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre) === query) ||
+    api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre).includes(query));
 
   if (!lugar) {
     estadoText.innerHTML = `<span class="error">❌ Lugar no encontrado. Escribe el nombre completo o selecciónalo de la lista.</span>`;
@@ -71,7 +71,7 @@ async function buscarLugarYRenderizar() {
   try {
     const filas = await api.buscarCentros(lugar);
     const total = mapa.dibujarPines(filas, db);
-    
+
     if (total > 0) {
       estadoText.innerHTML = `<span class="estado-ok">✅ Se ubicaron ${total} centros en ${lugar.nombre}.</span>`;
     } else {
@@ -85,6 +85,9 @@ async function buscarLugarYRenderizar() {
   }
 }
 
+// ==========================================
+// 3. FUNCIONES GLOBALES (Expuestas a la ventana)
+// ==========================================
 window.seleccionarCentro = (codigo, moverCamara) => {
   mapa.seleccionar(codigo, db, moverCamara);
 };
@@ -107,14 +110,14 @@ window.guardarEstadoBD = async (codigo) => {
   const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
   const chkDesmontado = document.getElementById(`chk_desmontado_${codigo}`);
   if (!selectElem) return;
-  
+
   const nuevoEstado = selectElem.value;
   const fechaSeleccionada = fechaElem ? fechaElem.value : null;
   const esDesmontado = chkDesmontado ? chkDesmontado.checked : false;
 
   try {
     const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada, { desmontado: esDesmontado });
-    
+
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
@@ -144,6 +147,55 @@ window.toggleVisitaRapida = async (codigo) => {
   }
 };
 
+window.registrarRemotoRapido = async (codigo) => {
+  const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
+  const fechaSeleccionada = fechaElem ? fechaElem.value : null;
+
+  try {
+    const info = await db.guardarEstado(codigo, "remoto", fechaSeleccionada, { mantenerVisitado: true });
+
+    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
+    if (marcadorInfo) {
+      marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
+    }
+
+    window.actualizarUIEstado(codigo, info);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.abrirEditFechaMapa = (codigo, indiceReal) => {
+  const box = document.getElementById(`edit_mapa_${codigo}_${indiceReal}`);
+  if (box) box.style.display = "flex";
+};
+
+window.guardarEditFechaMapa = async (codigo, indiceReal) => {
+  const inp = document.getElementById(`inp_fecha_mapa_${codigo}_${indiceReal}`);
+  if (!inp || !inp.value) return;
+
+  try {
+    const info = await db.editarFechaHistorial(codigo, indiceReal, inp.value);
+    window.actualizarUIEstado(codigo, info);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+window.eliminarHistMapa = async (codigo, indiceReal) => {
+  if (!confirm("¿Eliminar este registro del historial?")) return;
+  try {
+    const info = await db.eliminarRegistroHistorial(codigo, indiceReal);
+    const marcadorInfo = mapa.diccionarioMarcadores[codigo];
+    if (marcadorInfo) {
+      marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
+    }
+    window.actualizarUIEstado(codigo, info);
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
 window.actualizarUIEstado = (codigo, info) => {
   const esVisitado = info.estado === "visitado";
 
@@ -164,13 +216,17 @@ window.actualizarUIEstado = (codigo, info) => {
 
   // Actualizar Popup dentro del Mapa
   const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
+  const btnRemotoPopup = document.getElementById(`btn-popup-remoto-${codigo}`);
   const labelPopup = document.getElementById(`label_estado_${codigo}`);
   const selectPopup = document.getElementById(`select_estado_${codigo}`);
   const histPopup = document.getElementById(`historial_popup_${codigo}`);
 
   if (btnPopup) {
     btnPopup.classList.toggle("activo", esVisitado);
-    btnPopup.innerText = esVisitado ? "✓ Visitado (Registrar otra fecha)" : "Marcar Visitado";
+    btnPopup.innerText = esVisitado ? `✓ Visitado (${info.totalVisitas})` : "✓ Visitado";
+  }
+  if (btnRemotoPopup) {
+    btnRemotoPopup.innerText = info.totalRemotos > 0 ? `💻 Remoto (${info.totalRemotos})` : "💻 Remoto";
   }
   if (labelPopup) {
     labelPopup.innerText = mapa.formatearTextoPopup(info);
@@ -180,7 +236,7 @@ window.actualizarUIEstado = (codigo, info) => {
     window.toggleCheckDesmontado(codigo);
   }
   if (histPopup) {
-    histPopup.innerHTML = mapa.renderHistorialHTML(info.historial);
+    histPopup.innerHTML = mapa.renderHistorialHTML(codigo, info.historial);
   }
 };
 
@@ -213,7 +269,7 @@ function actualizarSugerencias() {
       <span class="badge-tipo ${lugar.tipo === 'Municipio' ? 'badge-municipio' : 'badge-distrito'}">${lugar.tipo}</span>
     </div>`
   ).join('');
-  
+
   cajaSugerencias.classList.add("show");
 }
 
