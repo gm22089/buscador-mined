@@ -153,9 +153,9 @@ window.toggleVisitaRapida = async (codigo) => {
 // Sincroniza textos, fechas y nombres de visitante en Popup y Tarjeta Lateral
 window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
   const esVisitado = estado === "visitado";
-  const textoDetalle = mapa.formatearDetalleEstado({ estado, fecha, usuario });
+  const info = { estado, fecha, usuario };
 
-  // 1. Actualizar Tarjeta Lateral
+  // Actualizar Tarjeta Lateral
   const card = document.getElementById(`card-ce-${codigo}`);
   const btnCard = document.getElementById(`btn-visita-${codigo}`);
   const badgeCard = document.getElementById(`badge-estado-${codigo}`);
@@ -163,17 +163,14 @@ window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
   if (card) card.classList.toggle("visitado", esVisitado);
   if (btnCard) {
     btnCard.classList.toggle("activo", esVisitado);
-    btnCard.style.background = esVisitado ? "#2e7d32" : "#e2e8f0";
-    btnCard.style.color = esVisitado ? "#fff" : "#1e293b";
     btnCard.innerText = esVisitado ? "✓ Visitado" : "Marcar Visita";
   }
   if (badgeCard) {
     badgeCard.className = `badge-estado-texto ${estado}`;
-    badgeCard.style.color = esVisitado ? "#2e7d32" : "#64748b";
-    badgeCard.innerText = textoDetalle;
+    badgeCard.innerText = mapa.formatearBadgeTarjeta(info);
   }
 
-  // 2. Actualizar Popup dentro del Mapa
+  // Actualizar Popup dentro del Mapa
   const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
   const labelPopup = document.getElementById(`label_estado_${codigo}`);
   const selectPopup = document.getElementById(`select_estado_${codigo}`);
@@ -181,11 +178,10 @@ window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
 
   if (btnPopup) {
     btnPopup.classList.toggle("activo", esVisitado);
-    btnPopup.style.background = esVisitado ? "#2e7d32" : "#1b365d";
     btnPopup.innerText = esVisitado ? "✓ Visitado" : "Marcar Visitado";
   }
   if (labelPopup) {
-    labelPopup.innerText = textoDetalle;
+    labelPopup.innerText = mapa.formatearTextoPopup(info);
   }
   if (selectPopup) {
     selectPopup.value = estado;
