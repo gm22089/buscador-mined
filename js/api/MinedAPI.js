@@ -159,4 +159,49 @@ export class MinedAPI {
     if (!texto) return "";
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   }
+
+  // Descarga el catálogo completo (Código, Nombre, Departamento, Municipio, Distrito) con caché de 24h
+  async obtenerCatalogoCompleto() {
+    const CACHE_KEY = "catalogo_completo_mined";
+    const CACHE_TIME_KEY = "catalogo_completo_time";
+    const limiteTiempo = 24 * 60 * 60 * 1000;
+    const ahora = Date.now();
+
+    try {
+      const cache = localStorage.getItem(CACHE_KEY);
+      const tiempo = localStorage.getItem(CACHE_TIME_KEY);
+      if (cache && tiempo && (ahora - Number(tiempo) < limiteTiempo)) {
+        const parsed = JSON.parse(cache);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn("No se pudo leer caché del catálogo:", e);
+    }
+
+    const body = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Código"},"Name":"CE_2024.Codigo"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Nombre del Centro Educativo"},"Name":"CE_2024.Nombre"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Departamento"},"Name":"CE_2024.Departamento"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Municipio"},"Name":"CE_2024.Municipio"},{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Distrito"},"Name":"CE_2024.Distrito"}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0,1,2,3,4]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"${this.DATASET_ID}","Sources":[{"ReportId":"${this.REPORT_ID}","VisualId":"0118ca5223a73939f738"}]}}],"cancelQueries":[],"modelId":${this.MODEL_ID}}`;
+
+    const respuesta = await this.hacerPeticion(body);
+    const filas = this.decodificarFilas(respuesta, 5);
+
+    const catalogo = filas
+      .filter(f => f && f[0])
+      .map(f => ({
+        codigo: String(f[0]).trim(),
+        nombre: f[1] || "Sin nombre",
+        departamento: f[2] || "Sin Departamento",
+        municipio: f[3] || "Sin Municipio",
+        distrito: f[4] || "Sin Distrito"
+      }));
+
+    try {
+      if (catalogo.length > 0) {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(catalogo));
+        localStorage.setItem(CACHE_TIME_KEY, ahora.toString());
+      }
+    } catch (e) {
+      console.warn("No se pudo guardar caché del catálogo:", e);
+    }
+
+    return catalogo;
+  }
 }
