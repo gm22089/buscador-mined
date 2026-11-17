@@ -28,10 +28,12 @@ export class MapaUI {
     const estado = infoBD?.estado || "normal";
     const fecha = infoBD?.fecha && infoBD.fecha !== "N/A" ? infoBD.fecha : "";
     const usuario = infoBD?.usuario ? ` por ${infoBD.usuario}` : "";
+    const tagDesmontado = infoBD?.desmontado ? " (Desmontado)" : "";
 
     if (estado === "visitado") return `Visitado el ${fecha}${usuario}`;
-    if (estado === "intervenido") return `Intervenido el ${fecha}${usuario}`;
+    if (estado === "intervenido") return `Intervenido${tagDesmontado} el ${fecha}${usuario}`;
     if (estado === "cerrado") return `Cerrado el ${fecha}${usuario}`;
+    if (infoBD?.historial?.length > 0) return `Sin Visitar (${infoBD.historial.length} reg. previos)`;
     return "Sin Visitar";
   }
 
@@ -39,18 +41,49 @@ export class MapaUI {
     const estado = infoBD?.estado || "normal";
     const fecha = infoBD?.fecha && infoBD.fecha !== "N/A" ? infoBD.fecha : "";
     const usuario = infoBD?.usuario ? ` · ${infoBD.usuario}` : "";
+    const tagDesmontado = infoBD?.desmontado ? " · Desmontado" : "";
+    const tagVisitas = (infoBD?.totalVisitas > 1) ? ` [${infoBD.totalVisitas}x]` : "";
 
-    if (estado === "visitado") return `✓ Visitado (${fecha}${usuario})`;
-    if (estado === "intervenido") return `🟠 Intervenido (${fecha}${usuario})`;
+    if (estado === "visitado") return `✓ Visitado${tagVisitas} (${fecha}${usuario})`;
+    if (estado === "intervenido") return `🟠 Intervenido${tagDesmontado} (${fecha}${usuario})`;
     if (estado === "cerrado") return `🔴 Cerrado (${fecha}${usuario})`;
+    if (infoBD?.historial?.length > 0) return `⏳ Pendiente (Hist: ${infoBD.historial.length})`;
     return "⏳ Pendiente";
+  }
+
+  renderHistorialHTML(historial) {
+    if (!Array.isArray(historial) || historial.length === 0) return "";
+    const recientes = [...historial].reverse();
+
+    const items = recientes.map(h => {
+      let icono = "📌";
+      let etiqueta = h.accion;
+      if (h.accion === "visitado") { icono = "✅"; etiqueta = "Visitado"; }
+      if (h.accion === "intervenido") {
+        icono = "🟠";
+        etiqueta = h.desmontado ? "Intervenido (Desmontado)" : "Intervenido";
+      }
+      if (h.accion === "cerrado") { icono = "🔴"; etiqueta = "Cerrado"; }
+      if (h.accion === "reiniciado") { icono = "🔄"; etiqueta = "Pasó a Sin Visitar"; }
+
+      return `<div style="padding:3px 0; border-bottom:1px dashed #cbd5e1; font-size:10.5px;">
+        ${icono} <strong>${this.escaparHTML(etiqueta)}</strong> · ${this.escaparHTML(h.fecha)} <span style="color:#475569;">(${this.escaparHTML(h.usuario)})</span>
+      </div>`;
+    }).join("");
+
+    return `
+      <div style="margin-top:8px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:5px; padding:6px;">
+        <div style="font-size:10.5px; font-weight:700; color:#14375E; margin-bottom:3px;">📋 Historial registrado (${historial.length}):</div>
+        <div style="max-height:85px; overflow-y:auto;">${items}</div>
+      </div>
+    `;
   }
 
   crearIcono(esSeleccionado = false, estadoBD = "normal") {
     let color = "#14375E"; 
     if (!esSeleccionado) {
       if (estadoBD === "visitado") color = "#28a745";
-      if (estadoBD === "intervenido") color = "#fd7e14";
+      if (estadoBD === "intervenido") color = "#fd7e14"; // Mismo color naranja incluso si está desmontado
       if (estadoBD === "cerrado") color = "#dc3545";
     } else {
       color = "#B8892B"; 
@@ -100,44 +133,52 @@ export class MapaUI {
     const esVisitado = colorEstado === "visitado";
     const textoEstado = this.formatearTextoPopup(infoBD);
     const hoy = this.obtenerFechaHoy();
+    const historialHTML = this.renderHistorialHTML(infoBD.historial);
 
-    // Si el centro ya tiene fecha registrada, muestra esa; si no, carga la fecha de hoy
-    const fechaInputVal = (colorEstado !== "normal" && infoBD.fecha && infoBD.fecha !== "N/A")
-      ? infoBD.fecha
-      : hoy;
+    // Por defecto carga la fecha de hoy para facilitar nuevas visitas en fechas distintas
+    const fechaInputVal = hoy;
+    const mostrarDesmontado = colorEstado === "intervenido" ? "block" : "none";
 
     return `
-      <div class="popup-mined" style="min-width: 225px;">
-        <h4 style="margin: 0 0 5px 0; color: #14375E;">INFRA: ${this.escaparHTML(String(codigo))}</h4>
-        <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 13px;">${this.escaparHTML(nombre || "Sin nombre")}</p>
-        <p style="margin: 0 0 5px 0; font-size: 11px; color: #666;"><strong>Distrito:</strong> ${this.escaparHTML(distrito || "")}</p>
+      <div class="popup-mined" style="min-width: 240px;">
+        <h4 style="margin: 0 0 4px 0; color: #14375E;">INFRA: ${this.escaparHTML(String(codigo))}</h4>
+        <p style="margin: 0 0 4px 0; font-weight: bold; font-size: 13px;">${this.escaparHTML(nombre || "Sin nombre")}</p>
+        <p style="margin: 0 0 6px 0; font-size: 11px; color: #666;"><strong>Distrito:</strong> ${this.escaparHTML(distrito || "")}</p>
         
-        <!-- Botón de 1-Clic -->
         <button id="btn-popup-visita-${codigo}" 
                 class="btn-visita-rapida ${esVisitado ? 'activo' : ''}" 
                 onclick="window.toggleVisitaRapida('${codigo}')" 
-                style="width: 100%; margin: 8px 0; padding: 7px;">
-          ${esVisitado ? '✓ Visitado' : 'Marcar Visitado'}
+                style="width: 100%; margin: 6px 0; padding: 7px;">
+          ${esVisitado ? '✓ Visitado (Registrar otra fecha)' : 'Marcar Visitado'}
         </button>
 
-        <div style="background: #e2e8f0; padding: 8px; border-radius: 6px; margin-bottom: 10px;">
+        <div style="background: #e2e8f0; padding: 8px; border-radius: 6px; margin-bottom: 8px;">
           <p style="margin: 0 0 6px 0; font-size: 11px; color: #333;">
-            <strong>Estado:</strong> <span id="label_estado_${codigo}">${this.escaparHTML(textoEstado)}</span>
+            <strong>Estado actual:</strong> <span id="label_estado_${codigo}">${this.escaparHTML(textoEstado)}</span>
           </p>
 
-          <label for="fecha_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Fecha de visita:</label>
+          <label for="fecha_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Fecha de visita / gestión:</label>
           <input type="date" id="fecha_estado_${codigo}" value="${fechaInputVal}" max="${hoy}" 
                  style="width: 100%; padding: 4px; font-size: 11px; margin-bottom: 6px; box-sizing: border-box;">
 
-          <label for="select_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Cambiar estado:</label>
-          <select id="select_estado_${codigo}" style="width: 100%; padding: 4px; font-size: 11px; margin-bottom: 6px;">
+          <label for="select_estado_${codigo}" style="display:block; font-size:10.5px; font-weight:bold; color:#333; margin-bottom:2px;">Estado:</label>
+          <select id="select_estado_${codigo}" onchange="window.toggleCheckDesmontado('${codigo}')" style="width: 100%; padding: 4px; font-size: 11px; margin-bottom: 6px;">
              <option value="normal" ${colorEstado === 'normal' ? 'selected' : ''}>Sin Visitar</option>
              <option value="visitado" ${colorEstado === 'visitado' ? 'selected' : ''}>Visitado (Verde)</option>
              <option value="intervenido" ${colorEstado === 'intervenido' ? 'selected' : ''}>Intervenido (Naranja)</option>
              <option value="cerrado" ${colorEstado === 'cerrado' ? 'selected' : ''}>Cerrado (Rojo)</option>
           </select>
 
-          <button onclick="window.guardarEstadoBD('${codigo}')" style="width: 100%; font-size: 11px; padding: 5px; cursor: pointer;">Guardar Cambio</button>
+          <div id="wrap_desmontado_${codigo}" style="display:${mostrarDesmontado}; background:#fff7ed; border:1px solid #fdba74; padding:5px; border-radius:4px; margin-bottom:6px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:bold; color:#9a3412; cursor:pointer; margin:0;">
+              <input type="checkbox" id="chk_desmontado_${codigo}" ${infoBD.desmontado ? 'checked' : ''}>
+              🔧 Equipo desmontado
+            </label>
+          </div>
+
+          <button onclick="window.guardarEstadoBD('${codigo}')" style="width: 100%; font-size: 11px; padding: 5px; cursor: pointer; font-weight:bold;">Guardar Cambio</button>
+          
+          <div id="historial_popup_${codigo}">${historialHTML}</div>
         </div>
 
         <button onclick="window.llevarAlBuscador('${this.escaparHTML(String(codigo))}')" style="display:block; width: 100%; padding: 6px; background: #B8892B; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Ver Expediente ↗</button>
@@ -165,14 +206,12 @@ export class MapaUI {
           icon: this.crearIcono(false, colorEstado)
         });
 
-        // Función dinámica para que al volver a abrir el pin muestre la fecha y usuario actualizados
         marcador.bindPopup(() => this.crearPopupHTML(codigo, nombre, distrito, dbManager));
         marcador.on('click', () => window.seleccionarCentro(codigo, false));
         this.capaPines.addLayer(marcador);
 
         this.diccionarioMarcadores[codigo] = { marcador, datos: { codigo, nombre, distrito } };
 
-        // Tarjeta en lista lateral con fecha y visitante
         htmlItems += `
           <div class="item-centro-card ${esVisitado ? 'visitado' : ''}" id="card-ce-${codigo}" onclick="window.seleccionarCentro('${codigo}', true)">
             <div class="card-head">

@@ -40,10 +40,41 @@ export class FirebaseManager {
   }
 
   getEstado(codigo) {
-    return this.diccionarioEstados[codigo] || { estado: "normal", fecha: "N/A", usuario: "" };
+    const raw = this.diccionarioEstados[codigo];
+    if (!raw) {
+      return {
+        estado: "normal",
+        desmontado: false,
+        fecha: "N/A",
+        usuario: "",
+        totalVisitas: 0,
+        historial: []
+      };
+    }
+
+    // Respalda automáticamente registros antiguos que aún no tenían arreglo 'historial'
+    let historial = Array.isArray(raw.historial) ? [...raw.historial] : [];
+    if (historial.length === 0 && raw.estado && raw.estado !== "normal") {
+      historial.push({
+        accion: raw.estado,
+        desmontado: Boolean(raw.desmontado),
+        fecha: raw.fecha || "",
+        usuario: raw.usuario || "Sin usuario"
+      });
+    }
+
+    const totalVisitas = historial.filter(h => h.accion === "visitado").length;
+
+    return {
+      estado: raw.estado || "normal",
+      desmontado: Boolean(raw.desmontado),
+      fecha: raw.fecha || "N/A",
+      usuario: raw.usuario || "",
+      totalVisitas,
+      historial
+    };
   }
 
-  // Consulta la colección 'usuarios_autorizados' en Firebase Firestore
   async verificarUsuarioEnFirebase(usuarioID, pin) {
     const idLimpio = usuarioID.trim().toLowerCase();
     const docRef = await this.db.collection("usuarios_autorizados").doc(idLimpio).get();
@@ -60,7 +91,7 @@ export class FirebaseManager {
     return datosUsuario.nombreMostrar || usuarioID;
   }
 
-  async guardarEstado(codigo, nuevoEstado, fechaPersonalizada = null) {
+  async guardarEstado(codigo, nuevoEstado, fechaPersonalizada = null, opciones = {}) {
     if (!this.usuarioActual) {
       const usuarioInput = prompt("Ingresa tu usuario:");
       if (!usuarioInput) throw new Error("Debes ingresar un usuario para guardar.");
@@ -78,10 +109,50 @@ export class FirebaseManager {
       ? fechaPersonalizada.trim()
       : this.obtenerFechaLocal();
 
-    const datos = { 
-      estado: nuevoEstado, 
-      fecha: fechaRegistro, 
-      usuario: this.usuarioActual 
+    const actual = this.getEstado(codigo);
+    const historial = [...actual.historial];
+    const esDesmontado = (nuevoEstado === "intervenido") ? Boolean(opciones.desmontado) : false;
+
+    if (nuevoEstado !== "normal") {
+      // Evita duplicar exactamente el mismo registro (mismo técnico + misma fecha + misma acción)
+      const yaExisteIdentico = historial.some(item =>
+        item.accion === nuevoEstado &&
+        item.fecha === fechaRegistro &&
+        (item.usuario || "").toLowerCase() === this.usuarioActual.toLowerCase() &&
+        Boolean(item.desmontado) === esDesmontado
+      );
+
+      if (yaExisteIdentico) {
+        throw new Error(`⚠️ Ya existe un registro de "${nuevoEstado}" por ${this.usuarioActual} en la fecha ${fechaRegistro}. Si es una nueva visita, selecciona otra fecha.`);
+      }
+
+      historial.push({
+        accion: nuevoEstado,
+        desmontado: esDesmontado,
+        fecha: fechaRegistro,
+        usuario: this.usuarioActual,
+        registradoEn: new Date().toISOString()
+      });
+    } else if (actual.estado !== "normal") {
+      // Si pasa de intervenido/visitado/cerrado a "Sin Visitar", guarda el evento en el respaldo
+      historial.push({
+        accion: "reiniciado",
+        desmontado: false,
+        fecha: fechaRegistro,
+        usuario: this.usuarioActual,
+        registradoEn: new Date().toISOString()
+      });
+    }
+
+    const totalVisitas = historial.filter(h => h.accion === "visitado").length;
+
+    const datos = {
+      estado: nuevoEstado,
+      desmontado: esDesmontado,
+      fecha: fechaRegistro,
+      usuario: this.usuarioActual,
+      totalVisitas,
+      historial
     };
 
     await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);

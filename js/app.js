@@ -6,23 +6,17 @@ const db = new FirebaseManager();
 const api = new MinedAPI();
 let mapa;
 
-// Elementos DOM
 const inputLugar = document.getElementById("lugarInput");
 const btnBuscar = document.getElementById("btnBuscar");
 const cajaSugerencias = document.getElementById("sugerenciasCaja");
 const estadoText = document.getElementById("estadoDiccionario");
 
-// Variables para autocompletado
 let sugerenciasActuales = [];
 let indiceActivo = -1;
 
-// ==========================================
-// 1. INICIALIZACIÓN ROBUSTA
-// ==========================================
 async function iniciarApp() {
   try {
     mapa = new MapaUI('mapa-mined');
-    
     estadoText.innerHTML = `⏳ Descargando listado de lugares actualizados...`;
 
     await Promise.all([
@@ -37,7 +31,6 @@ async function iniciarApp() {
     ]);
 
     estadoText.innerHTML = `<span class="estado-ok">✅ Zonas listas. Escribe un municipio o distrito.</span>`;
-    
     inputLugar.disabled = false;
     btnBuscar.disabled = false;
     inputLugar.focus();
@@ -58,9 +51,6 @@ if (document.readyState === "loading") {
   iniciarApp();
 }
 
-// ==========================================
-// 2. LÓGICA PRINCIPAL: BUSCAR Y RENDERIZAR
-// ==========================================
 async function buscarLugarYRenderizar() {
   const query = api.normalizarTexto(inputLugar.value.trim());
   if (!query) return estadoText.innerHTML = `<span class="error">Escribe un lugar antes de buscar.</span>`;
@@ -95,9 +85,6 @@ async function buscarLugarYRenderizar() {
   }
 }
 
-// ==========================================
-// 3. FUNCIONES GLOBALES (Expuestas a la ventana)
-// ==========================================
 window.seleccionarCentro = (codigo, moverCamara) => {
   mapa.seleccionar(codigo, db, moverCamara);
 };
@@ -107,53 +94,58 @@ window.llevarAlBuscador = (codigo) => {
   window.open(`index.html?ce=${encodeURIComponent(codigo)}`, '_blank');
 };
 
+window.toggleCheckDesmontado = (codigo) => {
+  const sel = document.getElementById(`select_estado_${codigo}`);
+  const wrap = document.getElementById(`wrap_desmontado_${codigo}`);
+  if (sel && wrap) {
+    wrap.style.display = sel.value === "intervenido" ? "block" : "none";
+  }
+};
+
 window.guardarEstadoBD = async (codigo) => {
   const selectElem = document.getElementById(`select_estado_${codigo}`);
   const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
+  const chkDesmontado = document.getElementById(`chk_desmontado_${codigo}`);
   if (!selectElem) return;
   
   const nuevoEstado = selectElem.value;
   const fechaSeleccionada = fechaElem ? fechaElem.value : null;
+  const esDesmontado = chkDesmontado ? chkDesmontado.checked : false;
 
   try {
-    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada);
+    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada, { desmontado: esDesmontado });
     
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
     }
 
-    window.actualizarUIEstado(codigo, info.estado, info.fecha, info.usuario);
+    window.actualizarUIEstado(codigo, info);
   } catch (error) {
     alert(error.message);
   }
 };
 
-// Alternar visita directa en 1 Clic (respeta la fecha elegida en el popup si está abierto, o usa hoy)
 window.toggleVisitaRapida = async (codigo) => {
-  const estadoActual = db.getEstado(codigo).estado;
-  const nuevoEstado = (estadoActual === "visitado") ? "normal" : "visitado";
   const fechaElem = document.getElementById(`fecha_estado_${codigo}`);
   const fechaSeleccionada = fechaElem ? fechaElem.value : null;
 
   try {
-    const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada);
+    const info = await db.guardarEstado(codigo, "visitado", fechaSeleccionada);
 
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
     }
 
-    window.actualizarUIEstado(codigo, info.estado, info.fecha, info.usuario);
+    window.actualizarUIEstado(codigo, info);
   } catch (error) {
     alert(error.message);
   }
 };
 
-// Sincroniza textos, fechas y nombres de visitante en Popup y Tarjeta Lateral
-window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
-  const esVisitado = estado === "visitado";
-  const info = { estado, fecha, usuario };
+window.actualizarUIEstado = (codigo, info) => {
+  const esVisitado = info.estado === "visitado";
 
   // Actualizar Tarjeta Lateral
   const card = document.getElementById(`card-ce-${codigo}`);
@@ -166,7 +158,7 @@ window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
     btnCard.innerText = esVisitado ? "✓ Visitado" : "Marcar Visita";
   }
   if (badgeCard) {
-    badgeCard.className = `badge-estado-texto ${estado}`;
+    badgeCard.className = `badge-estado-texto ${info.estado}`;
     badgeCard.innerText = mapa.formatearBadgeTarjeta(info);
   }
 
@@ -174,20 +166,21 @@ window.actualizarUIEstado = (codigo, estado, fecha = "", usuario = "") => {
   const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
   const labelPopup = document.getElementById(`label_estado_${codigo}`);
   const selectPopup = document.getElementById(`select_estado_${codigo}`);
-  const fechaPopup = document.getElementById(`fecha_estado_${codigo}`);
+  const histPopup = document.getElementById(`historial_popup_${codigo}`);
 
   if (btnPopup) {
     btnPopup.classList.toggle("activo", esVisitado);
-    btnPopup.innerText = esVisitado ? "✓ Visitado" : "Marcar Visitado";
+    btnPopup.innerText = esVisitado ? "✓ Visitado (Registrar otra fecha)" : "Marcar Visitado";
   }
   if (labelPopup) {
     labelPopup.innerText = mapa.formatearTextoPopup(info);
   }
   if (selectPopup) {
-    selectPopup.value = estado;
+    selectPopup.value = info.estado;
+    window.toggleCheckDesmontado(codigo);
   }
-  if (fechaPopup && estado === "normal") {
-    fechaPopup.value = mapa.obtenerFechaHoy();
+  if (histPopup) {
+    histPopup.innerHTML = mapa.renderHistorialHTML(info.historial);
   }
 };
 
@@ -198,9 +191,6 @@ window.seleccionarSugerencia = (i) => {
   buscarLugarYRenderizar();
 };
 
-// ==========================================
-// 4. AUTOCOMPLETADO Y SUGERENCIAS
-// ==========================================
 function actualizarSugerencias() {
   const query = api.normalizarTexto(inputLugar.value.trim());
   indiceActivo = -1;

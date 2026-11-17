@@ -112,6 +112,9 @@ if (document.readyState === "loading") {
 // ==========================================
 // GESTIÓN DE ESTADO DE VISITA (FIREBASE)
 // ==========================================
+// ==========================================
+// GESTIÓN DE ESTADO DE VISITA (FIREBASE)
+// ==========================================
 function actualizarIndicadorSesion() {
   const spanSesion = document.getElementById("infoSesionIndex");
   if (!spanSesion) return;
@@ -130,6 +133,55 @@ function cerrarSesionUsuarioIndex() {
   mostrarToast("Sesión cerrada. Se pedirá usuario y PIN al guardar.");
 }
 
+function toggleDesmontadoIndex() {
+  const sel = document.getElementById("estadoSelectIndex");
+  const wrap = document.getElementById("wrapDesmontadoIndex");
+  if (sel && wrap) {
+    wrap.style.display = sel.value === "intervenido" ? "block" : "none";
+  }
+}
+
+function renderHistorialIndex(historial) {
+  const cont = document.getElementById("historialContainerIndex");
+  if (!cont) return;
+
+  if (!Array.isArray(historial) || historial.length === 0) {
+    cont.innerHTML = "";
+    return;
+  }
+
+  const recientes = [...historial].reverse();
+  const filas = recientes.map(h => {
+    let badge = h.accion.toUpperCase();
+    let color = "#475569";
+    if (h.accion === "visitado") { badge = "✓ VISITADO"; color = "#166534"; }
+    if (h.accion === "intervenido") {
+      badge = h.desmontado ? "🟠 INTERVENIDO (DESMONTADO)" : "🟠 INTERVENIDO";
+      color = "#9a3412";
+    }
+    if (h.accion === "cerrado") { badge = "🔴 CERRADO"; color = "#991b1b"; }
+    if (h.accion === "reiniciado") { badge = "🔄 PASÓ A SIN VISITAR"; color = "#1e3a8a"; }
+
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid #e2e8f0; font-size:11.5px;">
+        <span style="font-weight:700; color:${color};">${badge}</span>
+        <span style="color:#334155;">${escapingHTML(h.fecha)} · <strong>${escapingHTML(h.usuario)}</strong></span>
+      </div>
+    `;
+  }).join("");
+
+  cont.innerHTML = `
+    <div style="border-top: 1px solid #cbd5e1; padding-top: 8px;">
+      <div style="font-size: 11px; font-weight: 700; color: #14375E; text-transform: uppercase; margin-bottom: 4px;">
+        📋 Historial de Visitas y Gestiones (${historial.length})
+      </div>
+      <div style="max-height: 140px; overflow-y: auto; padding-right: 4px;">
+        ${filas}
+      </div>
+    </div>
+  `;
+}
+
 function sincronizarPanelVisitaIndex(codigo) {
   codigoCEActual = String(codigo).trim();
   const info = db.getEstado(codigoCEActual);
@@ -141,19 +193,22 @@ function sincronizarPanelVisitaIndex(codigo) {
   const btnRapido = document.getElementById("btnVisitaRapidaIndex");
   const inputFecha = document.getElementById("fechaVisitaIndex");
   const selectEstado = document.getElementById("estadoSelectIndex");
+  const chkDesmontado = document.getElementById("chkDesmontadoIndex");
 
   const fechaTexto = info.fecha && info.fecha !== "N/A" ? info.fecha : "";
   const usuarioTexto = info.usuario ? ` por ${info.usuario}` : "";
+  const tagVisitas = info.totalVisitas > 1 ? ` · (${info.totalVisitas} visitas en total)` : "";
 
   if (badge) {
     if (estado === "visitado") {
       badge.style.background = "#dcfce7";
       badge.style.color = "#166534";
-      badge.textContent = `✓ Visitado el ${fechaTexto}${usuarioTexto}`;
+      badge.textContent = `✓ Visitado el ${fechaTexto}${usuarioTexto}${tagVisitas}`;
     } else if (estado === "intervenido") {
+      const tagDesm = info.desmontado ? " (Desmontado)" : "";
       badge.style.background = "#ffedd5";
       badge.style.color = "#9a3412";
-      badge.textContent = `🟠 Intervenido el ${fechaTexto}${usuarioTexto}`;
+      badge.textContent = `🟠 Intervenido${tagDesm} el ${fechaTexto}${usuarioTexto}`;
     } else if (estado === "cerrado") {
       badge.style.background = "#fee2e2";
       badge.style.color = "#991b1b";
@@ -161,36 +216,43 @@ function sincronizarPanelVisitaIndex(codigo) {
     } else {
       badge.style.background = "#e2e8f0";
       badge.style.color = "#1e293b";
-      badge.textContent = "⏳ Sin Visitar";
+      badge.textContent = info.historial.length > 0
+        ? `⏳ Sin Visitar (Tiene ${info.historial.length} registros previos)`
+        : "⏳ Sin Visitar";
     }
   }
 
   if (btnRapido) {
     btnRapido.style.background = esVisitado ? "#2e7d32" : "#14375E";
-    btnRapido.textContent = esVisitado ? "✓ Visitado (Clic para desmarcar)" : "✓ Marcar Visitado";
+    btnRapido.textContent = esVisitado ? "✓ Visitado (Registrar nueva fecha)" : "✓ Marcar Visitado";
   }
 
   if (inputFecha) {
     inputFecha.max = hoy;
-    inputFecha.value = (estado !== "normal" && fechaTexto) ? fechaTexto : hoy;
+    inputFecha.value = hoy;
   }
 
   if (selectEstado) {
     selectEstado.value = estado;
   }
+
+  if (chkDesmontado) {
+    chkDesmontado.checked = Boolean(info.desmontado);
+  }
+
+  toggleDesmontadoIndex();
+  renderHistorialIndex(info.historial);
 }
 
 async function marcarVisitadoRapidoIndex() {
   if (!codigoCEActual) return;
-  const estadoActual = db.getEstado(codigoCEActual).estado;
-  const nuevoEstado = estadoActual === "visitado" ? "normal" : "visitado";
   const fechaElegida = document.getElementById("fechaVisitaIndex")?.value || null;
 
   try {
-    await db.guardarEstado(codigoCEActual, nuevoEstado, fechaElegida);
+    await db.guardarEstado(codigoCEActual, "visitado", fechaElegida);
     actualizarIndicadorSesion();
     sincronizarPanelVisitaIndex(codigoCEActual);
-    mostrarToast(nuevoEstado === "visitado" ? "✅ Centro marcado como Visitado" : "Estado restablecido");
+    mostrarToast("✅ Visita registrada en el historial");
   } catch (error) {
     alert(error.message);
   }
@@ -200,12 +262,13 @@ async function guardarEstadoIndex() {
   if (!codigoCEActual) return;
   const nuevoEstado = document.getElementById("estadoSelectIndex").value;
   const fechaElegida = document.getElementById("fechaVisitaIndex").value;
+  const esDesmontado = document.getElementById("chkDesmontadoIndex")?.checked || false;
 
   try {
-    await db.guardarEstado(codigoCEActual, nuevoEstado, fechaElegida);
+    await db.guardarEstado(codigoCEActual, nuevoEstado, fechaElegida, { desmontado: esDesmontado });
     actualizarIndicadorSesion();
     sincronizarPanelVisitaIndex(codigoCEActual);
-    mostrarToast("✅ Estado y fecha guardados correctamente");
+    mostrarToast("✅ Registro guardado correctamente");
   } catch (error) {
     alert(error.message);
   }
@@ -333,7 +396,7 @@ function extraerValorMatricula(data) {
 function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
   const sinDato = (valor === "Dato no disponible" || valor === "Matrícula no encontrada");
   const valorSeguro = String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, " ");
-  
+
   let contenidoDerecho = "";
 
   if (esEnlace && !sinDato && valor.includes("http")) {
@@ -343,8 +406,8 @@ function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
     const nombreApp = esWaze ? "Waze" : "Maps";
     const claseEstilo = esWaze ? "btn-app-waze" : "btn-app-maps";
 
-    let botonCoords = coords 
-      ? `<button class="btn-mini-coords" onclick="event.stopPropagation(); copiarAlPortapapeles('${coords}', 'Coordenadas')" title="Copiar Coordenadas">📍 Coords</button>` 
+    let botonCoords = coords
+      ? `<button class="btn-mini-coords" onclick="event.stopPropagation(); copiarAlPortapapeles('${coords}', 'Coordenadas')" title="Copiar Coordenadas">📍 Coords</button>`
       : "";
 
     contenidoDerecho = `
@@ -616,7 +679,7 @@ function extraerCoordenadas(url) {
   const regexMaps = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
   const regexMapsQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
   const regexGeneric = /(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/;
-  
+
   const match = url.match(regexWaze) || url.match(regexMaps) || url.match(regexMapsQ) || url.match(regexGeneric);
   if (match) {
     return `${match[1]}, ${match[2]}`;
@@ -635,3 +698,4 @@ window.seleccionarSugerencia = seleccionarSugerencia;
 window.marcarVisitadoRapidoIndex = marcarVisitadoRapidoIndex;
 window.guardarEstadoIndex = guardarEstadoIndex;
 window.cerrarSesionUsuarioIndex = cerrarSesionUsuarioIndex;
+window.toggleDesmontadoIndex = toggleDesmontadoIndex;
