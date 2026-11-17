@@ -250,11 +250,6 @@ function escapingHTML(str) {
   return div.innerHTML;
 }
 
-function escapingHTML(str) {
-  const div = document.createElement("div");
-  div.innerText = str;
-  return div.innerHTML;
-}
 
 // En copiarFilaExcel() dentro de index.js:
 function copiarFilaExcel() {
