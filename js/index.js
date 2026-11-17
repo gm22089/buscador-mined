@@ -1,6 +1,12 @@
+import { FirebaseManager } from './db/FirebaseManager.js';
+
+const db = new FirebaseManager();
+
 let diccionarioNombres = [];
 let textoSuperFetchGuardado = "";
-let datosCEActual = {}; // Almacena los datos extraídos en memoria
+let datosCEActual = {};
+let codigoCEActual = "";
+let promesaFirebase = null;
 
 const HEADERS_API = {
   "Accept": "application/json, text/plain, */*",
@@ -32,59 +38,178 @@ const CAMPO_MATRICULA = { titulo: "Matrícula (Niñas / Niños / Total)", visual
 const CAMPO_SUPER_FETCH = { visualId: "d05d6442e975bcb494d7" };
 
 // ==========================================
-// PASO 0: DESCARGAR DICCIONARIO AL INICIAR (CON CACHÉ DE 24 HORAS)
+// PASO 0: DESCARGAR DICCIONARIO Y ESTADOS AL INICIAR
 // ==========================================
-window.onload = async function() {
-    const CACHE_KEY = "diccionario_ce_mined";
-    const CACHE_TIME_KEY = "diccionario_ce_mined_time";
-    const HORAS_CACHE = 24;
-    const limiteTiempo = HORAS_CACHE * 60 * 60 * 1000;
-    const tiempoActual = Date.now();
+async function iniciarAppIndex() {
+  actualizarIndicadorSesion();
 
-    const cacheGuardada = localStorage.getItem(CACHE_KEY);
-    const tiempoGuardado = localStorage.getItem(CACHE_TIME_KEY);
+  promesaFirebase = db.cargarEstadosIniciales().catch(err => {
+    console.warn("No se pudieron cargar estados de Firebase:", err);
+    return {};
+  });
 
-    if (cacheGuardada && tiempoGuardado && (tiempoActual - tiempoGuardado < limiteTiempo)) {
-        diccionarioNombres = JSON.parse(cacheGuardada);
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">⚡ Diccionario cargado desde caché local (${diccionarioNombres.length} CEs).</span>`;
-        document.getElementById("ceInput").disabled = false;
-        document.getElementById("btnBuscar").disabled = false;
-        document.getElementById("ceInput").focus();
-        
-        verificarBusquedaAutomatica();
-        return;
+  const CACHE_KEY = "diccionario_ce_mined";
+  const CACHE_TIME_KEY = "diccionario_ce_mined_time";
+  const HORAS_CACHE = 24;
+  const limiteTiempo = HORAS_CACHE * 60 * 60 * 1000;
+  const tiempoActual = Date.now();
+
+  const cacheGuardada = localStorage.getItem(CACHE_KEY);
+  const tiempoGuardado = localStorage.getItem(CACHE_TIME_KEY);
+
+  if (cacheGuardada && tiempoGuardado && (tiempoActual - tiempoGuardado < limiteTiempo)) {
+    diccionarioNombres = JSON.parse(cacheGuardada);
+    document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">⚡ Diccionario cargado desde caché local (${diccionarioNombres.length} CEs).</span>`;
+    document.getElementById("ceInput").disabled = false;
+    document.getElementById("btnBuscar").disabled = false;
+    document.getElementById("ceInput").focus();
+
+    await promesaFirebase;
+    verificarBusquedaAutomatica();
+    return;
+  }
+
+  document.getElementById("estadoDiccionario").innerHTML = `⏳ Descargando diccionario actualizado desde el MINED...`;
+  const bodyDiccionario = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"},"Name":"CE_2024.Infra_y_Nombre_CE"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"}}}]},"Binding":{"Primary":{"Groupings":[{"Projections":[0]}]},"DataReduction":{"DataVolume":3,"Primary":{"Top":{"Count":30000}}},"Version":1},"ExecutionMetricsKind":1}}]},"ApplicationContext":{"DatasetId":"1286915e-8f7f-487f-bae3-73a9e488c456","Sources":[{"ReportId":"243201a2-4a9e-4f70-9997-ed23d079ba3f","VisualId":"9e229e8ff2abde49259a"}]}}],"cancelQueries":[],"modelId":3759890}`;
+
+  try {
+    const [response] = await Promise.all([
+      fetch(URL_API, { headers: HEADERS_API, body: bodyDiccionario, method: "POST", mode: "cors" }),
+      promesaFirebase
+    ]);
+    const textoCrudo = await response.text();
+
+    const regexColegios = /"\d{4,5}\s+[^"]+"/g;
+    const coincidencias = textoCrudo.match(regexColegios);
+
+    if (coincidencias && coincidencias.length > 0) {
+      diccionarioNombres = coincidencias.map(texto => texto.replace(/"/g, ''));
+      diccionarioNombres = [...new Set(diccionarioNombres)];
+
+      localStorage.setItem(CACHE_KEY, JSON.stringify(diccionarioNombres));
+      localStorage.setItem(CACHE_TIME_KEY, tiempoActual.toString());
+
+      document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ Diccionario descargado y guardado con ${diccionarioNombres.length} Centros Escolares.</span>`;
+      document.getElementById("ceInput").disabled = false;
+      document.getElementById("btnBuscar").disabled = false;
+      document.getElementById("ceInput").focus();
+
+      verificarBusquedaAutomatica();
+    } else {
+      document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ El servidor no devolvió la lista. Puede que la sesión haya caducado.</span>`;
     }
+  } catch (error) {
+    document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar el diccionario.</span>`;
+  }
+}
 
-    document.getElementById("estadoDiccionario").innerHTML = `⏳ Descargando diccionario actualizado desde el MINED...`;
-    const bodyDiccionario = `{"version":"1.0.0","queries":[{"Query":{"Commands":[{"SemanticQueryDataShapeCommand":{"Query":{"Version":2,"From":[{"Name":"c","Entity":"CE_2024","Type":0}],"Select":[{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"},"Name":"CE_2024.Infra_y_Nombre_CE"}],"OrderBy":[{"Direction":1,"Expression":{"Column":{"Expression":{"SourceRef":{"Source":"c"}},"Property":"Infra_y_Nombre_CE"}}}]},\"Binding\":{\"Primary\":{\"Groupings\":[{\"Projections\":[0]}]},\"DataReduction\":{\"DataVolume\":3,\"Primary\":{\"Top\":{\"Count\":30000}}},\"Version\":1},\"ExecutionMetricsKind\":1}}]},\"ApplicationContext\":{\"DatasetId\":\"1286915e-8f7f-487f-bae3-73a9e488c456\",\"Sources\":[{\"ReportId\":\"243201a2-4a9e-4f70-9997-ed23d079ba3f\",\"VisualId\":\"9e229e8ff2abde49259a\"}]}}],\"cancelQueries\":[],\"modelId\":3759890}`;
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", iniciarAppIndex);
+} else {
+  iniciarAppIndex();
+}
 
-    try {
-        const response = await fetch(URL_API, { headers: HEADERS_API, body: bodyDiccionario, method: "POST", mode: "cors" });
-        const textoCrudo = await response.text();
+// ==========================================
+// GESTIÓN DE ESTADO DE VISITA (FIREBASE)
+// ==========================================
+function actualizarIndicadorSesion() {
+  const spanSesion = document.getElementById("infoSesionIndex");
+  if (!spanSesion) return;
 
-        const regexColegios = /"\d{4,5}\s+[^"]+"/g;
-        const coincidencias = textoCrudo.match(regexColegios);
+  if (db.usuarioActual) {
+    spanSesion.innerHTML = `👤 <strong>${escapingHTML(db.usuarioActual)}</strong> · <a href="#" onclick="event.preventDefault(); cerrarSesionUsuarioIndex();" style="color:#dc2626; text-decoration:underline;">Salir</a>`;
+  } else {
+    spanSesion.innerHTML = `🔒 Requiere usuario y PIN para marcar`;
+  }
+}
 
-        if (coincidencias && coincidencias.length > 0) {
-            diccionarioNombres = coincidencias.map(texto => texto.replace(/"/g, ''));
-            diccionarioNombres = [...new Set(diccionarioNombres)];
+function cerrarSesionUsuarioIndex() {
+  localStorage.removeItem("usuario_ce_mapa");
+  db.usuarioActual = null;
+  actualizarIndicadorSesion();
+  mostrarToast("Sesión cerrada. Se pedirá usuario y PIN al guardar.");
+}
 
-            localStorage.setItem(CACHE_KEY, JSON.stringify(diccionarioNombres));
-            localStorage.setItem(CACHE_TIME_KEY, tiempoActual.toString());
+function sincronizarPanelVisitaIndex(codigo) {
+  codigoCEActual = String(codigo).trim();
+  const info = db.getEstado(codigoCEActual);
+  const estado = info.estado || "normal";
+  const esVisitado = estado === "visitado";
+  const hoy = db.obtenerFechaLocal();
 
-            document.getElementById("estadoDiccionario").innerHTML = `<span class="estado-ok">✅ Diccionario descargado y guardado con ${diccionarioNombres.length} Centros Escolares.</span>`;
-            document.getElementById("ceInput").disabled = false;
-            document.getElementById("btnBuscar").disabled = false;
-            document.getElementById("ceInput").focus();
+  const badge = document.getElementById("badgeEstadoIndex");
+  const btnRapido = document.getElementById("btnVisitaRapidaIndex");
+  const inputFecha = document.getElementById("fechaVisitaIndex");
+  const selectEstado = document.getElementById("estadoSelectIndex");
 
-            verificarBusquedaAutomatica();
-        } else {
-            document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ El servidor no devolvió la lista. Puede que la sesión haya caducado.</span>`;
-        }
-    } catch (error) {
-        document.getElementById("estadoDiccionario").innerHTML = `<span class="error">❌ Error de conexión al descargar el diccionario.</span>`;
+  const fechaTexto = info.fecha && info.fecha !== "N/A" ? info.fecha : "";
+  const usuarioTexto = info.usuario ? ` por ${info.usuario}` : "";
+
+  if (badge) {
+    if (estado === "visitado") {
+      badge.style.background = "#dcfce7";
+      badge.style.color = "#166534";
+      badge.textContent = `✓ Visitado el ${fechaTexto}${usuarioTexto}`;
+    } else if (estado === "intervenido") {
+      badge.style.background = "#ffedd5";
+      badge.style.color = "#9a3412";
+      badge.textContent = `🟠 Intervenido el ${fechaTexto}${usuarioTexto}`;
+    } else if (estado === "cerrado") {
+      badge.style.background = "#fee2e2";
+      badge.style.color = "#991b1b";
+      badge.textContent = `🔴 Cerrado el ${fechaTexto}${usuarioTexto}`;
+    } else {
+      badge.style.background = "#e2e8f0";
+      badge.style.color = "#1e293b";
+      badge.textContent = "⏳ Sin Visitar";
     }
-};
+  }
+
+  if (btnRapido) {
+    btnRapido.style.background = esVisitado ? "#2e7d32" : "#14375E";
+    btnRapido.textContent = esVisitado ? "✓ Visitado (Clic para desmarcar)" : "✓ Marcar Visitado";
+  }
+
+  if (inputFecha) {
+    inputFecha.max = hoy;
+    inputFecha.value = (estado !== "normal" && fechaTexto) ? fechaTexto : hoy;
+  }
+
+  if (selectEstado) {
+    selectEstado.value = estado;
+  }
+}
+
+async function marcarVisitadoRapidoIndex() {
+  if (!codigoCEActual) return;
+  const estadoActual = db.getEstado(codigoCEActual).estado;
+  const nuevoEstado = estadoActual === "visitado" ? "normal" : "visitado";
+  const fechaElegida = document.getElementById("fechaVisitaIndex")?.value || null;
+
+  try {
+    await db.guardarEstado(codigoCEActual, nuevoEstado, fechaElegida);
+    actualizarIndicadorSesion();
+    sincronizarPanelVisitaIndex(codigoCEActual);
+    mostrarToast(nuevoEstado === "visitado" ? "✅ Centro marcado como Visitado" : "Estado restablecido");
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+async function guardarEstadoIndex() {
+  if (!codigoCEActual) return;
+  const nuevoEstado = document.getElementById("estadoSelectIndex").value;
+  const fechaElegida = document.getElementById("fechaVisitaIndex").value;
+
+  try {
+    await db.guardarEstado(codigoCEActual, nuevoEstado, fechaElegida);
+    actualizarIndicadorSesion();
+    sincronizarPanelVisitaIndex(codigoCEActual);
+    mostrarToast("✅ Estado y fecha guardados correctamente");
+  } catch (error) {
+    alert(error.message);
+  }
+}
 
 // ==========================================
 // CONEXIÓN ENTRE PÁGINAS (MAPA -> MAESTRO)
@@ -121,10 +246,10 @@ async function ejecutarBusquedaMaestra() {
   const nombreCE = diccionarioNombres.find(nombre => nombre.startsWith(codigoCorto));
 
   if (!nombreCE) {
-      estadoText.innerText = `❌ No se encontró ningún Centro Escolar que inicie con el código "${codigoCorto}".`;
-      estadoText.className = "error";
-      dashboardCE.style.display = "none";
-      return;
+    estadoText.innerText = `❌ No se encontró ningún Centro Escolar que inicie con el código "${codigoCorto}".`;
+    estadoText.className = "error";
+    dashboardCE.style.display = "none";
+    return;
   }
 
   estadoText.innerHTML = `Detectado: <strong>${nombreCE}</strong><br>Consultando el dataset en paralelo…`;
@@ -134,7 +259,6 @@ async function ejecutarBusquedaMaestra() {
   previewBox.innerText = "Cargando bloque…";
   btnBuscar.disabled = true;
 
-  // Reiniciamos objeto temporal de datos
   datosCEActual = {};
 
   for (let i = 0; i < CAMPOS.length + 1; i++) {
@@ -142,6 +266,8 @@ async function ejecutarBusquedaMaestra() {
   }
 
   try {
+    if (promesaFirebase) await promesaFirebase;
+
     const peticionesCampos = CAMPOS.map(campo => hacerPeticion(generarBodyCampo(campo, nombreCE)));
     const peticionMatricula = hacerPeticion(generarBodyMatricula(nombreCE));
     const peticionSuperFetch = hacerPeticion(generarBodySuperFetch(nombreCE));
@@ -160,7 +286,6 @@ async function ejecutarBusquedaMaestra() {
       const campo = CAMPOS[i];
       const valor = extraerValorEstandar(resp);
 
-      // Guardamos la respuesta directamente en memoria por título de campo
       datosCEActual[campo.titulo] = (valor === "Dato no disponible") ? "" : valor;
 
       agregarFilaUI(campo.titulo, valor, listaDetalles, !!campo.esEnlace);
@@ -171,6 +296,9 @@ async function ejecutarBusquedaMaestra() {
 
     textoSuperFetchGuardado = extraerValorEstandar(respSuperFetch);
     previewBox.innerText = textoSuperFetchGuardado;
+
+    const codigoDetectado = datosCEActual["Código de infraestructura"] || nombreCE.split(" ")[0];
+    sincronizarPanelVisitaIndex(codigoDetectado);
 
     estadoText.innerText = "";
     dashboardCE.style.display = "grid";
@@ -202,8 +330,6 @@ function extraerValorMatricula(data) {
   } catch (e) { return "Dato no disponible"; }
 }
 
-// Renderiza cada fila de datos en un formato compacto y copiable al toque
-// Renderiza cada fila de datos compacta y con mensaje personalizado al copiar
 function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
   const sinDato = (valor === "Dato no disponible" || valor === "Matrícula no encontrada");
   const valorSeguro = String(valor).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, " ");
@@ -231,7 +357,6 @@ function agregarFilaUI(titulo, valor, contenedor, esEnlace = false) {
   }
 
   const claseValor = sinDato ? "valor no-disp" : "valor";
-  // Le pasamos el valor exacto a la función copiarAlPortapapeles
   const atributoClick = sinDato ? "" : `onclick="copiarAlPortapapeles('${valorSeguro}', '${titulo}')" title="Toca para copiar"`;
 
   contenedor.innerHTML += `
@@ -250,17 +375,13 @@ function escapingHTML(str) {
   return div.innerHTML;
 }
 
-
-// En copiarFilaExcel() dentro de index.js:
 function copiarFilaExcel() {
-  // 1. Extraemos el código de infraestructura y los demás datos guardados en memoria
   const infra = datosCEActual["Código de infraestructura"] || "";
   const nombre = datosCEActual["Nombre del centro educativo"] || "";
   const departamento = datosCEActual["Departamento"] || "";
   const direccion = datosCEActual["Dirección"] || "";
   const municipio = datosCEActual["Municipio"] || "";
 
-  // 2. Extraemos la zona (RURAL / URBANA) buscando en la Ficha Resumen (SuperFetch)
   let zona = "";
   if (textoSuperFetchGuardado) {
     const matchZona = textoSuperFetchGuardado.match(/\b(RURAL|URBANA)\b/i);
@@ -269,10 +390,7 @@ function copiarFilaExcel() {
     }
   }
 
-  // 3. Limpiamos saltos de línea y espacios extras
   const limpiar = (t) => String(t).replace(/[\r\n\t]+/g, " ").trim();
-
-  // 4. Cadena horizontal: Infra (Col B) -> Nombre (Col C) -> Dep (Col D) -> Dir (Col E) -> Mun (Col F) -> Zona (Col G)
   const filaFormateada = `${limpiar(infra)}\t${limpiar(nombre)}\t${limpiar(departamento)}\t${limpiar(direccion)}\t${limpiar(municipio)}\t${limpiar(zona)}`;
 
   copiarAlPortapapeles(filaFormateada);
@@ -342,7 +460,6 @@ function copiarSuperFetch() {
 function fallbackCopiar(texto, mensajePersonalizado) {
   const textArea = document.createElement("textarea");
   textArea.value = texto;
-
   textArea.style.top = "0";
   textArea.style.left = "0";
   textArea.style.position = "fixed";
@@ -493,7 +610,6 @@ document.addEventListener("click", function (e) {
   }
 });
 
-// Extrae 'latitud, longitud' desde enlaces de Google Maps, Waze o enlaces genéricos de mapa
 function extraerCoordenadas(url) {
   if (!url || typeof url !== "string") return null;
   const regexWaze = /ll=(-?\d+\.\d+),(-?\d+\.\d+)/;
@@ -503,7 +619,19 @@ function extraerCoordenadas(url) {
   
   const match = url.match(regexWaze) || url.match(regexMaps) || url.match(regexMapsQ) || url.match(regexGeneric);
   if (match) {
-    return `${match[1]}, ${match[2]}`; // Formato: "13.7941, -88.8965"
+    return `${match[1]}, ${match[2]}`;
   }
   return null;
 }
+
+// ==========================================
+// EXPONER FUNCIONES A WINDOW (Requerido por type="module")
+// ==========================================
+window.ejecutarBusquedaMaestra = ejecutarBusquedaMaestra;
+window.copiarFilaExcel = copiarFilaExcel;
+window.copiarSuperFetch = copiarSuperFetch;
+window.copiarAlPortapapeles = copiarAlPortapapeles;
+window.seleccionarSugerencia = seleccionarSugerencia;
+window.marcarVisitadoRapidoIndex = marcarVisitadoRapidoIndex;
+window.guardarEstadoIndex = guardarEstadoIndex;
+window.cerrarSesionUsuarioIndex = cerrarSesionUsuarioIndex;
