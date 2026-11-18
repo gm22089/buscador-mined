@@ -14,6 +14,14 @@ export class MapaUI {
 
     L.control.layers({ "🗺️ Mapa Estándar": mapaCalles, "🛰️ Vista Satelital": mapaSatelite }).addTo(this.mapa);
     this.capaPines = L.featureGroup().addTo(this.mapa);
+    // Recalcula automáticamente los mosaicos del mapa cuando cambia de tamaño o se expande
+    const contenedorMapa = document.getElementById(idContenedor);
+    if (contenedorMapa && typeof ResizeObserver !== 'undefined') {
+      const observadorTamano = new ResizeObserver(() => {
+        this.mapa.invalidateSize();
+      });
+      observadorTamano.observe(contenedorMapa);
+    }
   }
 
   obtenerFechaHoy() {
@@ -99,14 +107,14 @@ export class MapaUI {
   }
 
   crearIcono(esSeleccionado = false, estadoBD = "normal") {
-    let color = "#14375E"; 
+    let color = "#14375E";
     if (!esSeleccionado) {
       if (estadoBD === "visitado") color = "#28a745";
       if (estadoBD === "remoto") color = "#7c3aed";
       if (estadoBD === "intervenido") color = "#fd7e14";
       if (estadoBD === "cerrado") color = "#dc3545";
     } else {
-      color = "#B8892B"; 
+      color = "#B8892B";
     }
 
     const tamano = esSeleccionado ? [36, 48] : [28, 38];
@@ -292,7 +300,7 @@ export class MapaUI {
     this.codigoSeleccionadoActual = codigo;
     const itemActual = this.diccionarioMarcadores[codigo];
     const estadoActual = dbManager.getEstado(codigo).estado;
-    
+
     itemActual.marcador.setIcon(this.crearIcono(true, estadoActual));
     itemActual.marcador.setZIndexOffset(1000);
 

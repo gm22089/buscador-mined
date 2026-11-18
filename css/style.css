@@ -905,3 +905,92 @@
     padding: 7px 8px;
   }
 }
+/* ==========================================
+   9. MAPA RESPONSIVO Y MODO EXPANDIDO
+   ========================================== */
+main.main-mapa {
+  max-width: min(1680px, 95vw);
+}
+
+main.main-mapa .buscador,
+main.main-mapa #estadoDiccionario {
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.panel-mapa {
+  padding: 0 !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* En pantallas de escritorio, el mapa y la lista aprovechan la altura del monitor */
+@media (min-width: 901px) {
+  main.main-mapa .layout-mapa {
+    grid-template-columns: 380px 1fr;
+  }
+
+  main.main-mapa #mapa-mined {
+    height: calc(100vh - 245px);
+    min-height: 600px;
+  }
+
+  main.main-mapa .panel-lista {
+    max-height: calc(100vh - 245px);
+    min-height: 600px;
+  }
+
+  main.main-mapa .lista-centros-vertical {
+    max-height: none;
+    flex: 1;
+  }
+}
+
+/* Botón flotante junto a los controles de zoom de Leaflet */
+.btn-expandir-mapa {
+  position: absolute;
+  top: 11px;
+  left: 54px;
+  z-index: 1000;
+  background: #ffffff;
+  color: var(--azul-inst);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn-expandir-mapa:hover {
+  background: var(--azul-inst);
+  color: #ffffff;
+}
+
+/* Estado Expandido (Pantalla completa) */
+.panel-mapa.mapa-expandido {
+  position: fixed !important;
+  inset: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999;
+  border-radius: 0 !important;
+  margin: 0 !important;
+}
+
+.panel-mapa.mapa-expandido #mapa-mined {
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  border-radius: 0;
+  border: none;
+}
+
+.panel-mapa.mapa-expandido .btn-expandir-mapa {
+  background: var(--rojo);
+  color: #ffffff;
+  border-color: #ffffff;
+}

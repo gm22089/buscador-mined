@@ -296,3 +296,25 @@ document.addEventListener("click", (e) => {
     cajaSugerencias.classList.remove("show");
   }
 });
+window.toggleExpandirMapa = () => {
+  const panelMapa = document.getElementById("panelMapaContenedor");
+  const btnExpandir = document.getElementById("btnExpandirMapa");
+  if (!panelMapa || !btnExpandir) return;
+
+  const expandido = panelMapa.classList.toggle("mapa-expandido");
+  document.body.style.overflow = expandido ? "hidden" : "";
+  btnExpandir.innerHTML = expandido ? "✕ Contraer mapa" : "⛶ Expandir mapa";
+
+  if (mapa && mapa.mapa) {
+    setTimeout(() => mapa.mapa.invalidateSize(), 120);
+  }
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const panelMapa = document.getElementById("panelMapaContenedor");
+    if (panelMapa && panelMapa.classList.contains("mapa-expandido")) {
+      window.toggleExpandirMapa();
+    }
+  }
+});
