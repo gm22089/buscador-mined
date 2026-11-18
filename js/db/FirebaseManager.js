@@ -12,10 +12,11 @@ export class FirebaseManager {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
-    
+
     this.db = firebase.firestore();
     this.diccionarioEstados = {};
     this.usuarioActual = localStorage.getItem("usuario_ce_mapa") || null;
+    this.CACHE_KEY = "cache_estados_mined_v2";
   }
 
   obtenerFechaLocal() {
@@ -26,16 +27,85 @@ export class FirebaseManager {
     return `${anio}-${mes}-${dia}`;
   }
 
-  async cargarEstadosIniciales() {
+  leerCacheLocal() {
+    try {
+      const raw = localStorage.getItem(this.CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.datos === "object" && typeof parsed.lastSync === "number") {
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("No se pudo leer caché local de estados:", e);
+    }
+    return null;
+  }
+
+  guardarCacheLocal(lastSync = Date.now()) {
+    try {
+      localStorage.setItem(this.CACHE_KEY, JSON.stringify({
+        lastSync,
+        datos: this.diccionarioEstados
+      }));
+    } catch (e) {
+      console.warn("No se pudo guardar caché local de estados:", e);
+    }
+  }
+
+  async cargarEstadosIniciales(forzarCompleto = false) {
+    const cache = !forzarCompleto ? this.leerCacheLocal() : null;
+
+    // 1. Si ya existe copia local, descargar ÚNICAMENTE los documentos modificados desde lastSync
+    if (cache && Object.keys(cache.datos).length > 0) {
+      this.diccionarioEstados = { ...cache.datos };
+
+      try {
+        // Margen de 60 segundos para compensar pequeñas diferencias de reloj entre dispositivos
+        const desdeTimestamp = Math.max(0, cache.lastSync - 60000);
+        const snapshotCambios = await this.db
+          .collection("estados_escuelas")
+          .where("ultimaActualizacion", ">", desdeTimestamp)
+          .get();
+
+        let nuevoLastSync = cache.lastSync;
+
+        if (!snapshotCambios.empty) {
+          snapshotCambios.forEach(doc => {
+            const data = doc.data();
+            this.diccionarioEstados[doc.id] = data;
+            if (data.ultimaActualizacion && data.ultimaActualizacion > nuevoLastSync) {
+              nuevoLastSync = data.ultimaActualizacion;
+            }
+          });
+          this.guardarCacheLocal(nuevoLastSync);
+        }
+
+        return this.diccionarioEstados;
+      } catch (error) {
+        console.warn("Usando copia local (sin conexión o cuota temporalmente agotada):", error);
+        return this.diccionarioEstados;
+      }
+    }
+
+    // 2. Primera carga en este navegador: descargar colección completa una sola vez
     try {
       const snapshot = await this.db.collection("estados_escuelas").get();
+      this.diccionarioEstados = {};
+      let maxTimestamp = Date.now();
+
       snapshot.forEach(doc => {
-        this.diccionarioEstados[doc.id] = doc.data();
+        const data = doc.data();
+        this.diccionarioEstados[doc.id] = data;
+        if (data.ultimaActualizacion && data.ultimaActualizacion > maxTimestamp) {
+          maxTimestamp = data.ultimaActualizacion;
+        }
       });
+
+      this.guardarCacheLocal(maxTimestamp);
       return this.diccionarioEstados;
     } catch (error) {
       console.error("Error conectando a Firebase:", error);
-      return {};
+      return this.diccionarioEstados || {};
     }
   }
 
@@ -147,7 +217,6 @@ export class FirebaseManager {
       });
     }
 
-    // Si el CE ya estaba "visitado" y se registra un trabajo "remoto" rápido, conserva el estado "visitado"
     let estadoFinal = nuevoEstado;
     if (nuevoEstado === "remoto" && opciones.mantenerVisitado && actual.estado === "visitado") {
       estadoFinal = "visitado";
@@ -155,6 +224,7 @@ export class FirebaseManager {
 
     const totalVisitas = historial.filter(h => h.accion === "visitado").length;
     const totalRemotos = historial.filter(h => h.accion === "remoto").length;
+    const ahora = Date.now();
 
     const datos = {
       estado: estadoFinal,
@@ -163,15 +233,16 @@ export class FirebaseManager {
       usuario: this.usuarioActual,
       totalVisitas,
       totalRemotos,
-      historial
+      historial,
+      ultimaActualizacion: ahora
     };
 
     await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
     this.diccionarioEstados[codigo] = datos;
+    this.guardarCacheLocal(ahora);
     return this.getEstado(codigo);
   }
 
-  // Permite corregir una fecha mal ingresada directamente desde el historial
   async editarFechaHistorial(codigo, indiceReal, nuevaFecha) {
     await this.asegurarSesion();
 
@@ -192,12 +263,11 @@ export class FirebaseManager {
       editadoPor: this.usuarioActual
     };
 
-    // Si se editó el último registro, actualizar también la fecha principal del documento
     const esUltimo = indiceReal === historial.length - 1;
     const fechaPrincipal = esUltimo ? nuevaFecha : actual.fecha;
-
     const totalVisitas = historial.filter(h => h.accion === "visitado").length;
     const totalRemotos = historial.filter(h => h.accion === "remoto").length;
+    const ahora = Date.now();
 
     const datos = {
       estado: actual.estado,
@@ -206,15 +276,16 @@ export class FirebaseManager {
       usuario: actual.usuario,
       totalVisitas,
       totalRemotos,
-      historial
+      historial,
+      ultimaActualizacion: ahora
     };
 
     await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
     this.diccionarioEstados[codigo] = datos;
+    this.guardarCacheLocal(ahora);
     return this.getEstado(codigo);
   }
 
-  // Permite eliminar un registro equivocado del historial
   async eliminarRegistroHistorial(codigo, indiceReal) {
     await this.asegurarSesion();
 
@@ -241,6 +312,8 @@ export class FirebaseManager {
       nuevoDesmontado = Boolean(ultimo.desmontado);
     }
 
+    const ahora = Date.now();
+
     const datos = {
       estado: nuevoEstado,
       desmontado: nuevoDesmontado,
@@ -248,11 +321,13 @@ export class FirebaseManager {
       usuario: nuevoUsuario,
       totalVisitas,
       totalRemotos,
-      historial
+      historial,
+      ultimaActualizacion: ahora
     };
 
     await this.db.collection("estados_escuelas").doc(String(codigo)).set(datos);
     this.diccionarioEstados[codigo] = datos;
+    this.guardarCacheLocal(ahora);
     return this.getEstado(codigo);
   }
 }
