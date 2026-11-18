@@ -15,7 +15,8 @@ export class FirebaseManager {
 
     this.db = firebase.firestore();
     this.diccionarioEstados = {};
-    this.usuarioActual = localStorage.getItem("usuario_ce_mapa") || null;
+    const sesionGuardada = localStorage.getItem("usuario_ce_mapa");
+    this.usuarioActual = sesionGuardada ? sesionGuardada.trim().toUpperCase() : null;
     this.CACHE_KEY = "cache_estados_mined_v2";
   }
 
@@ -172,7 +173,7 @@ export class FirebaseManager {
       if (!pinInput) throw new Error("Debes ingresar tu clave.");
 
       const nombreVerificado = await this.verificarUsuarioEnFirebase(usuarioInput, pinInput);
-      this.usuarioActual = nombreVerificado;
+      this.usuarioActual = nombreVerificado.trim().toUpperCase();
       localStorage.setItem("usuario_ce_mapa", this.usuarioActual);
     }
   }
