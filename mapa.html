@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mapa de Centros Escolares — MINED</title>
   <link rel="icon" type="image/png" href="img/favicon.png">
-  
+
   <!-- CSS del Mapa (Leaflet) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- Tu CSS unificado -->
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
 
   <header class="top">
@@ -19,7 +21,7 @@
     </div>
     <h1>Mapa de Centros Escolares</h1>
     <p class="sub">Visualiza las escuelas por municipio o distrito geográficamente.</p>
-    
+
     <!-- 📍 Navegación -->
     <nav class="subnav">
       <a href="index.html">🔎 Buscar por código o nombre</a>
@@ -33,17 +35,18 @@
     <!-- Buscador Superior -->
     <div class="buscador">
       <div class="campo-busqueda">
-        <input type="text" id="lugarInput" placeholder="Escribe un Municipio o Distrito (Ej. Santa Ana)" disabled autocomplete="off">
+        <input type="text" id="lugarInput" placeholder="Escribe un Municipio o Distrito (Ej. Santa Ana)" disabled
+          autocomplete="off">
         <div id="sugerenciasCaja" class="sugerencias"></div>
       </div>
       <button class="btn-buscar" id="btnBuscar" disabled>Mapear Zona</button>
     </div>
-    
+
     <div id="estadoDiccionario">Cargando mapa...</div>
 
     <!-- 📍 CONTENEDOR PRINCIPAL EN 2 COLUMNAS (LISTA + MAPA) -->
     <div class="layout-mapa">
-      
+
       <!-- COLUMNA IZQUIERDA: Listado de Centros -->
       <div id="contenedorListaMapeados" class="panel panel-lista" style="display: none;">
         <h3>Centros Ubicados (<span id="totalMapeados">0</span>)</h3>
@@ -53,7 +56,8 @@
 
       <!-- COLUMNA DERECHA: Mapa Interactivo -->
       <div id="panelMapaContenedor" class="panel panel-mapa">
-        <button type="button" id="btnExpandirMapa" class="btn-expandir-mapa" onclick="window.toggleExpandirMapa()" title="Expandir o contraer el mapa">
+        <button type="button" id="btnExpandirMapa" class="btn-expandir-mapa" onclick="window.toggleExpandirMapa()"
+          title="Expandir o contraer el mapa">
           ⛶ Expandir mapa
         </button>
         <div id="mapa-mined"></div>
@@ -70,6 +74,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Nuevo script modular principal -->
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <script type="module" src="js/app.js?v=4"></script>
 </body>
+
 </html>

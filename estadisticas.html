@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,11 +10,12 @@
   <style>
     .filtros-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
       gap: 12px;
       align-items: end;
       margin-bottom: 18px;
     }
+
     .campo-filtro label {
       display: block;
       font-size: 12px;
@@ -21,7 +23,9 @@
       margin-bottom: 5px;
       color: var(--azul-inst, #1b365d);
     }
-    .campo-filtro input, .campo-filtro select {
+
+    .campo-filtro input,
+    .campo-filtro select {
       width: 100%;
       padding: 9px 10px;
       border: 1px solid #cbd5e1;
@@ -29,10 +33,12 @@
       font-size: 13.5px;
       background: #fff;
     }
+
     .botones-filtro {
       display: flex;
       gap: 8px;
     }
+
     .btn-secundario {
       padding: 10px 14px;
       border: 1px solid #cbd5e1;
@@ -42,12 +48,14 @@
       font-weight: 600;
       cursor: pointer;
     }
+
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 14px;
       margin-bottom: 20px;
     }
+
     .kpi-card {
       background: #fff;
       border: 1px solid #e2e8f0;
@@ -55,19 +63,45 @@
       border-radius: 10px;
       padding: 14px 16px;
     }
-    .kpi-card.verde { border-left-color: #2e7d32; }
-    .kpi-card.naranja { border-left-color: #e65100; }
-    .kpi-card.dorado { border-left-color: #eab308; }
-    .kpi-titulo { font-size: 11.5px; text-transform: uppercase; font-weight: 700; color: #64748b; }
-    .kpi-numero { font-size: 26px; font-weight: 800; margin: 4px 0; color: #0f172a; }
-    .kpi-detalle { font-size: 12px; color: #64748b; }
+
+    .kpi-card.verde {
+      border-left-color: #2e7d32;
+    }
+
+    .kpi-card.morado {
+      border-left-color: #7c3aed;
+    }
+
+    .kpi-card.naranja {
+      border-left-color: #e65100;
+    }
+
+    .kpi-titulo {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .kpi-numero {
+      font-size: 26px;
+      font-weight: 800;
+      margin: 4px 0;
+      color: #0f172a;
+    }
+
+    .kpi-detalle {
+      font-size: 12px;
+      color: #64748b;
+    }
 
     .paneles-estadisticas {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
       gap: 18px;
       margin-bottom: 20px;
     }
+
     .tabla-wrapper {
       max-height: 380px;
       overflow-y: auto;
@@ -75,27 +109,33 @@
       border: 1px solid #e2e8f0;
       border-radius: 8px;
     }
+
     .tabla-datos {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
     }
+
     .tabla-datos th {
       position: sticky;
       top: 0;
       background: #f8fafc;
       text-align: left;
       padding: 10px 8px;
-      font-size: 12px;
+      font-size: 11.5px;
       color: #475569;
       border-bottom: 2px solid #e2e8f0;
       z-index: 1;
     }
+
     .tabla-datos td {
       padding: 8px;
       border-bottom: 1px solid #f1f5f9;
     }
-    .tabla-datos tr:hover td { background: #f8fafc; }
+
+    .tabla-datos tr:hover td {
+      background: #f8fafc;
+    }
 
     .barra-progreso {
       width: 100%;
@@ -105,24 +145,55 @@
       overflow: hidden;
       margin-top: 4px;
     }
+
     .barra-progreso-fill {
       height: 100%;
       background: #2e7d32;
       transition: width 0.3s ease;
     }
+
     .pill-estado {
-      padding: 2px 8px;
+      padding: 2px 7px;
       border-radius: 12px;
-      font-size: 11.5px;
+      font-size: 11px;
       font-weight: 700;
       display: inline-block;
+      white-space: nowrap;
     }
-    .pill-visitado { background: #dcfce7; color: #166534; }
-    .pill-intervenido { background: #ffedd5; color: #9a3412; }
-    .pill-cerrado { background: #fee2e2; color: #991b1b; }
-    .pill-normal { background: #f1f5f9; color: #475569; }
+
+    .pill-visitado {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .pill-remoto {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
+
+    .pill-intervenido {
+      background: #ffedd5;
+      color: #9a3412;
+    }
+
+    .pill-desmontado {
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #f59e0b;
+    }
+
+    .pill-cerrado {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .pill-normal {
+      background: #f1f5f9;
+      color: #475569;
+    }
   </style>
 </head>
+
 <body>
 
   <header class="top">
@@ -130,8 +201,9 @@
       <span class="eyebrow">Ministerio de Educación</span>
     </div>
     <h1>Panel de Estadísticas y Seguimiento</h1>
-    <p class="sub">Consulta el avance de visitas por usuario, departamento, municipio, distrito y rango de fechas.</p>
-    
+    <p class="sub">Consulta visitas presenciales, gestiones remotas, intervenciones, equipos desmontados y avance
+      territorial.</p>
+
     <nav class="subnav">
       <a href="index.html">🔎 Buscar por código o nombre</a>
       <a href="coordenadas.html">📍 Buscar por zona (Muni/Dist)</a>
@@ -155,9 +227,20 @@
           <input type="date" id="fechaFin">
         </div>
         <div class="campo-filtro">
-          <label for="filtroUsuario">Usuario:</label>
+          <label for="filtroUsuario">Usuario / Técnico:</label>
           <select id="filtroUsuario">
             <option value="TODOS">Todos los usuarios</option>
+          </select>
+        </div>
+        <div class="campo-filtro">
+          <label for="filtroTipo">Tipo de Gestión:</label>
+          <select id="filtroTipo">
+            <option value="TODOS">Todas las gestiones</option>
+            <option value="visitado">✓ Visitas presenciales</option>
+            <option value="remoto">💻 Trabajos remotos</option>
+            <option value="intervenido">🟠 Intervenidos (todos)</option>
+            <option value="desmontado">🔧 Solo equipos desmontados</option>
+            <option value="cerrado">🔴 Cerrados</option>
           </select>
         </div>
         <div class="campo-filtro">
@@ -193,37 +276,41 @@
         <div class="kpi-detalle">Escuelas en la zona filtrada</div>
       </div>
       <div class="kpi-card verde">
-        <div class="kpi-titulo">CEs Visitados</div>
+        <div class="kpi-titulo">CEs Visitados (Cobertura)</div>
         <div class="kpi-numero" id="kpiVisitados">0</div>
-        <div class="kpi-detalle">Marcados como visitados</div>
+        <div class="kpi-detalle" id="kpiVisitadosDetalle">0% cobertura · 0 visitas totales</div>
+      </div>
+      <div class="kpi-card morado">
+        <div class="kpi-titulo">Trabajos Remotos</div>
+        <div class="kpi-numero" id="kpiRemotos">0</div>
+        <div class="kpi-detalle" id="kpiRemotosDetalle">En 0 centros educativos</div>
       </div>
       <div class="kpi-card naranja">
-        <div class="kpi-titulo">Intervenidos / Cerrados</div>
+        <div class="kpi-titulo">Intervenidos / Desmontados</div>
         <div class="kpi-numero" id="kpiOtros">0</div>
-        <div class="kpi-detalle" id="kpiOtrosDetalle">0 intervenidos · 0 cerrados</div>
-      </div>
-      <div class="kpi-card dorado">
-        <div class="kpi-titulo">Porcentaje de Cobertura</div>
-        <div class="kpi-numero" id="kpiPorcentaje">0%</div>
-        <div class="kpi-detalle">Visitados sobre el total</div>
+        <div class="kpi-detalle" id="kpiOtrosDetalle">0 desmontados · 0 cerrados</div>
       </div>
     </div>
 
     <!-- PANELES AGRUPADOS -->
     <div class="paneles-estadisticas">
       <!-- PANEL POR USUARIO -->
-      <div class="panel">
-        <h2>👤 Resumen por Usuario</h2>
-        <p class="desc">Cantidad de centros gestionados por cada técnico en el rango elegido.</p>
+      <div class="panel" style="grid-column: 1 / -1;">
+        <h2>👤 Actividad Detallada por Usuario / Técnico</h2>
+        <p class="desc">Contabiliza cada visita presencial, soporte remoto, intervención, equipo desmontado y cierre
+          registrado por cada técnico.</p>
         <div class="tabla-wrapper">
           <table class="tabla-datos">
             <thead>
               <tr>
-                <th>Usuario</th>
-                <th>Visitados</th>
-                <th>Interv.</th>
+                <th>Usuario / Técnico</th>
+                <th>Visitas</th>
+                <th>Remotos</th>
+                <th>Intervenidos</th>
+                <th>Desmontados</th>
                 <th>Cerrados</th>
-                <th>Total</th>
+                <th>CEs Únicos</th>
+                <th>Total Gestiones</th>
               </tr>
             </thead>
             <tbody id="tbodyUsuarios"></tbody>
@@ -233,8 +320,8 @@
 
       <!-- PANEL POR DEPARTAMENTO -->
       <div class="panel">
-        <h2>🏛️ Avance por Departamento</h2>
-        <p class="desc">Porcentaje de centros visitados respecto al total departamental.</p>
+        <h2>🏛️ Cobertura por Departamento</h2>
+        <p class="desc">Porcentaje de escuelas únicas visitadas respecto al total departamental.</p>
         <div class="tabla-wrapper">
           <table class="tabla-datos">
             <thead>
@@ -251,7 +338,7 @@
 
       <!-- PANEL POR MUNICIPIO -->
       <div class="panel">
-        <h2>🏙️ Avance por Municipio</h2>
+        <h2>🏙️ Cobertura por Municipio</h2>
         <p class="desc">Desglose municipal ordenado por porcentaje de cumplimiento.</p>
         <div class="tabla-wrapper">
           <table class="tabla-datos">
@@ -269,7 +356,7 @@
 
       <!-- PANEL POR DISTRITO -->
       <div class="panel">
-        <h2>📍 Avance por Distrito</h2>
+        <h2>📍 Cobertura por Distrito</h2>
         <p class="desc">Desglose distrital ordenado por porcentaje de cumplimiento.</p>
         <div class="tabla-wrapper">
           <table class="tabla-datos">
@@ -286,14 +373,16 @@
       </div>
     </div>
 
-    <!-- TABLA DETALLADA -->
+    <!-- TABLA DETALLADA DE EVENTOS -->
     <div class="panel">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
-          <h2 style="margin:0;">📋 Detalle de Centros Educativos (<span id="totalDetalle">0</span>)</h2>
-          <p class="desc" style="margin:4px 0 0 0;">Haz clic en un código INFRA para abrir su ficha completa.</p>
+          <h2 style="margin:0;">📋 Bitácora Detallada de Gestiones (<span id="totalDetalle">0</span>)</h2>
+          <p class="desc" style="margin:4px 0 0 0;">Muestra cada visita, soporte remoto o intervención por fecha y
+            técnico.</p>
         </div>
-        <button class="btn-super-fetch" id="btnExportarCSV" style="width:auto; margin:0;">📥 Exportar a Excel (CSV)</button>
+        <button class="btn-super-fetch" id="btnExportarCSV" style="width:auto; margin:0;">📥 Exportar a Excel
+          (CSV)</button>
       </div>
 
       <div class="tabla-wrapper" style="max-height: 450px;">
@@ -305,9 +394,10 @@
               <th>Departamento</th>
               <th>Municipio</th>
               <th>Distrito</th>
-              <th>Estado</th>
+              <th>Gestión / Estado</th>
+              <th>Desmontado</th>
               <th>Fecha</th>
-              <th>Usuario</th>
+              <th>Técnico</th>
             </tr>
           </thead>
           <tbody id="tbodyDetalle"></tbody>
@@ -321,6 +411,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <!-- Lógica modular del panel -->
-  <script type="module" src="js/estadisticas.js"></script>
+  <script type="module" src="js/estadisticas.js?v=2"></script>
 </body>
+
 </html>

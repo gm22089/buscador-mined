@@ -56,7 +56,7 @@ async function buscarLugarYRenderizar() {
   if (!query) return estadoText.innerHTML = `<span class="error">Escribe un lugar antes de buscar.</span>`;
 
   const lugar = api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre) === query) ||
-    api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre).includes(query));
+                api.diccionarioLugares.find(l => api.normalizarTexto(l.nombre).includes(query));
 
   if (!lugar) {
     estadoText.innerHTML = `<span class="error">❌ Lugar no encontrado. Escribe el nombre completo o selecciónalo de la lista.</span>`;
@@ -86,15 +86,29 @@ async function buscarLugarYRenderizar() {
 }
 
 // ==========================================
-// 3. FUNCIONES GLOBALES (Expuestas a la ventana)
+// FUNCIONES GLOBALES (Expuestas a window)
 // ==========================================
 window.seleccionarCentro = (codigo, moverCamara) => {
-  mapa.seleccionar(codigo, db, moverCamara);
+  if (mapa) mapa.seleccionar(codigo, db, moverCamara);
 };
 
 window.llevarAlBuscador = (codigo) => {
   if (!codigo || codigo === "N/A") return;
   window.open(`index.html?ce=${encodeURIComponent(codigo)}`, '_blank');
+};
+
+window.toggleExpandirMapa = () => {
+  const panelMapa = document.getElementById("panelMapaContenedor");
+  const btnExpandir = document.getElementById("btnExpandirMapa");
+  if (!panelMapa || !btnExpandir) return;
+
+  const expandido = panelMapa.classList.toggle("mapa-expandido");
+  document.body.style.overflow = expandido ? "hidden" : "";
+  btnExpandir.innerHTML = expandido ? "✕ Contraer mapa" : "⛶ Expandir mapa";
+
+  if (mapa && mapa.mapa) {
+    setTimeout(() => mapa.mapa.invalidateSize(), 120);
+  }
 };
 
 window.toggleCheckDesmontado = (codigo) => {
@@ -117,12 +131,10 @@ window.guardarEstadoBD = async (codigo) => {
 
   try {
     const info = await db.guardarEstado(codigo, nuevoEstado, fechaSeleccionada, { desmontado: esDesmontado });
-
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
     }
-
     window.actualizarUIEstado(codigo, info);
   } catch (error) {
     alert(error.message);
@@ -135,12 +147,10 @@ window.toggleVisitaRapida = async (codigo) => {
 
   try {
     const info = await db.guardarEstado(codigo, "visitado", fechaSeleccionada);
-
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
     }
-
     window.actualizarUIEstado(codigo, info);
   } catch (error) {
     alert(error.message);
@@ -153,12 +163,10 @@ window.registrarRemotoRapido = async (codigo) => {
 
   try {
     const info = await db.guardarEstado(codigo, "remoto", fechaSeleccionada, { mantenerVisitado: true });
-
     const marcadorInfo = mapa.diccionarioMarcadores[codigo];
     if (marcadorInfo) {
       marcadorInfo.marcador.setIcon(mapa.crearIcono(mapa.codigoSeleccionadoActual === codigo, info.estado));
     }
-
     window.actualizarUIEstado(codigo, info);
   } catch (error) {
     alert(error.message);
@@ -199,7 +207,6 @@ window.eliminarHistMapa = async (codigo, indiceReal) => {
 window.actualizarUIEstado = (codigo, info) => {
   const esVisitado = info.estado === "visitado";
 
-  // Actualizar Tarjeta Lateral
   const card = document.getElementById(`card-ce-${codigo}`);
   const btnCard = document.getElementById(`btn-visita-${codigo}`);
   const badgeCard = document.getElementById(`badge-estado-${codigo}`);
@@ -214,7 +221,6 @@ window.actualizarUIEstado = (codigo, info) => {
     badgeCard.innerText = mapa.formatearBadgeTarjeta(info);
   }
 
-  // Actualizar Popup dentro del Mapa
   const btnPopup = document.getElementById(`btn-popup-visita-${codigo}`);
   const btnRemotoPopup = document.getElementById(`btn-popup-remoto-${codigo}`);
   const labelPopup = document.getElementById(`label_estado_${codigo}`);
@@ -291,30 +297,17 @@ function manejarTecladoSugerencias(e) {
   }
 }
 
-document.addEventListener("click", (e) => {
-  if (cajaSugerencias && !cajaSugerencias.contains(e.target) && e.target !== inputLugar) {
-    cajaSugerencias.classList.remove("show");
-  }
-});
-window.toggleExpandirMapa = () => {
-  const panelMapa = document.getElementById("panelMapaContenedor");
-  const btnExpandir = document.getElementById("btnExpandirMapa");
-  if (!panelMapa || !btnExpandir) return;
-
-  const expandido = panelMapa.classList.toggle("mapa-expandido");
-  document.body.style.overflow = expandido ? "hidden" : "";
-  btnExpandir.innerHTML = expandido ? "✕ Contraer mapa" : "⛶ Expandir mapa";
-
-  if (mapa && mapa.mapa) {
-    setTimeout(() => mapa.mapa.invalidateSize(), 120);
-  }
-};
-
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     const panelMapa = document.getElementById("panelMapaContenedor");
     if (panelMapa && panelMapa.classList.contains("mapa-expandido")) {
       window.toggleExpandirMapa();
     }
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (cajaSugerencias && !cajaSugerencias.contains(e.target) && e.target !== inputLugar) {
+    cajaSugerencias.classList.remove("show");
   }
 });
